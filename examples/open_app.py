@@ -21,14 +21,10 @@ import sys
 
 
 def main():
-    platform = sys.platform
-
-    if platform == "linux":
+    if sys.platform == "linux":
         signal.signal(signal.SIGCHLD, signal.SIG_IGN)
-        _ = subprocess.Popen(sys.argv[1:])
 
-    elif platform == "windows":
-        _ = subprocess.Popen(sys.argv[1:])
+    _ = subprocess.Popen(sys.argv[1:])
 
 
 if __name__ == "__main__":

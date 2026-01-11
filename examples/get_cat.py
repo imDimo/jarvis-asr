@@ -19,17 +19,13 @@ import sys
 
 
 def main():
+    if sys.platform == "linux":
+        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+
     BROWSER = ""  # Enter path to browser here
     URL = "https://cataas.com/cat"
 
-    platform = sys.platform
-
-    if platform == "linux":
-        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
-        _ = subprocess.Popen([BROWSER, URL])
-
-    elif platform == "windows":
-        _ = subprocess.Popen([BROWSER, URL])
+    _ = subprocess.Popen([BROWSER, URL])
 
 
 if __name__ == "__main__":
