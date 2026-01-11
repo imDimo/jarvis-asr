@@ -77,7 +77,7 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<crate::execute
         // Get phrase
         let phrase = ex.get("phrase").ok_or(String::from("Could not find 'phrase' data in an executables array object"))?
         .as_str().ok_or(String::from("'phrase' data in executables array should have been a string type"))?
-        .to_owned();
+        .to_lowercase();
 
         // Get command
         let command = ex.get("command").ok_or(String::from("Could not find 'command' data in an executables array object"))?
