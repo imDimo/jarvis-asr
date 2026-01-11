@@ -92,7 +92,7 @@ fn match_phrase(input : &str, phrase : &str) -> (bool, PhraseArgs) {
         if phrase_parts.len() > words.len() - start {
             return (false, phrase_args);
         }
-        
+
         // Match spoken words to wildcard/list arguments
         for i in 0..phrase_parts.len() {
             if words[start + i] != phrase_parts[i] {
@@ -109,6 +109,11 @@ fn match_phrase(input : &str, phrase : &str) -> (bool, PhraseArgs) {
                     phrase_matches = false;
                     break;
                 }
+            }
+
+            // Return if fully matched
+            if i == phrase_parts.len() - 1 {
+                return (phrase_matches, phrase_args);
             }
         }
     }
