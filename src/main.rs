@@ -248,7 +248,7 @@ fn print_help() {
         \n\nRun phrase detection using a user-provided VOSK model. \
         \n\nOptions: \
         \n -a, --add-command\t\trun the add command utility \
-        \n -d, --device <num>\t\tuse the specified input device (see '--query') \
+        \n -d, --device <num>\t\tuse the specified input device (see '--query-devices') \
         \n -h, --help\t\t\tdisplay this message \
         \n -m, --model <path-to-model>\tuse the VOSK model located at the specified path  \
         \n -p, --print\t\t\tprint detected speech \
