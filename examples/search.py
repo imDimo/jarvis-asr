@@ -15,6 +15,7 @@
 # - Args:
 #   - /path/to/search.py
 #   - <query...>
+# - Match type: 1
 
 # Now, while running jarvis-asr, "jarvis search [query]" should bring up the
 # search in your specified browser

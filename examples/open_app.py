@@ -12,6 +12,7 @@
 # - Args:
 #   - /path/to/open_app.py
 #   - <app>
+# - Match type: 1
 
 # Now, while running jarvis-asr, "jarvis run [app]" should open the application
 

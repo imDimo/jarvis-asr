@@ -9,6 +9,7 @@
 #   - /path/to/multi_demo.py
 #   - <num>
 #   - <color>
+# - Match type: 1
 
 # Note that argument names are not required to be unique; you could replace
 # both <num> and <color> with <arg> and it will run the same.

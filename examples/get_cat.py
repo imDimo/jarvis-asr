@@ -10,6 +10,7 @@
 # - Command: python3
 # - Args:
 #   - /path/to/get_cat.py
+# - Match type: 1
 
 # Now, while running jarvis-asr, "jarvis give me a cat" should display a cat
 

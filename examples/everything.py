@@ -12,6 +12,7 @@
 #   - <adj>
 #   - <adj>
 #   - <objects...>
+# - Match type: 1
 
 # Unique and duplicate arguments can be mixed together, and each set of
 # duplicates will be taken from the phrase left-to-right.
