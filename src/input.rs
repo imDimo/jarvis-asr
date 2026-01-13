@@ -64,12 +64,26 @@ pub fn get_cpal_input_devices() -> anyhow::Result<Vec<cpal::Device>, String> {
     Ok(input_devices)
 }
 
-pub fn print_cpal_device_descriptions(input_devices : &[cpal::Device]) {
-    let descriptions = input_devices.iter().map(|d| d.description().expect("Error getting device description"))
-        .collect::<Vec<_>>();
+pub fn print_cpal_device_descriptions(input_devices : &[cpal::Device]) -> anyhow::Result<(), String> {
+    let mut desc_errs : Vec<String> = vec!();
+    let descriptions = input_devices.iter().filter_map( |d| {
+        match d.description() {
+            Ok(desc) => Some(desc),
+            Err(e) => {
+                desc_errs.push(e.to_string());
+                None
+            }
+        }
+    }).collect::<Vec<_>>();
+    
+    if !desc_errs.is_empty() {
+        desc_errs.iter().for_each(|e| eprintln!("Error getting device description: {}", e));
+        Err(String::from("One or more input devices could not retrieve a device description"))?;
+    }
 
     let default_description = cpal::default_host().default_input_device().unwrap()
-        .description().expect("Error getting default device description");
+        .description()
+        .map_err(|e| format!("Error getting default device description: {}", e))?;
 
     println!("0: {:?}", default_description.name());
 
@@ -81,4 +95,6 @@ pub fn print_cpal_device_descriptions(input_devices : &[cpal::Device]) {
             println!("\t{:?}", e);
         });
     });
+
+    Ok(())
 }

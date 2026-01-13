@@ -115,15 +115,19 @@ fn apply_arguments(executable : &Executable, arguments : &PhraseArgs) -> anyhow:
         return Err(String::from("Argument length of phrase and executable did not match"));
     }
 
-    // Add default and paramaterized arguments
+    // Add default and parameterized arguments
     let mut applied_args : Vec<String> = vec!();
     executable.args.iter().for_each(|arg| {
         if arg_type(arg) == ArgumentType::Wildcard {
-            let wildcard_arg = wildcard_args.iter().enumerate().find(|(_, (label, _))| label == arg)
-                .expect("Invalid argument label encountered");
+            let wildcard_opt = wildcard_args.iter().enumerate().find(|(_index, (label, _data))| label == arg);
 
-            applied_args.push(wildcard_arg.1.1.clone());
-            wildcard_args.remove(wildcard_arg.0);
+            if let Some((arg_index, arg_data)) = wildcard_opt {
+                applied_args.push(arg_data.1.clone());
+                wildcard_args.remove(arg_index);
+            }
+            else {
+                eprintln!("Mismatched arguments detected!");
+            }
         }
         else if arg_type(arg) == ArgumentType::List {
             if let Some(mut args_list) = list_args.clone() {

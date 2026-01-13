@@ -60,7 +60,7 @@ fn main() -> anyhow::Result<(), String> {
     if program_args.query_devices {
         if !input_devices.is_empty() {
             println!("Available Devices:");
-            input::print_cpal_device_descriptions(&input_devices);
+            input::print_cpal_device_descriptions(&input_devices)?;
         }
         else {
             println!("No suitable input devices detected");
@@ -87,7 +87,8 @@ fn main() -> anyhow::Result<(), String> {
         input::get_cpal_default_input_device()?
     } 
     else {
-        input_devices.get(input_device_index - 1).expect("Device index out of bounds").clone()
+        input_devices.get(input_device_index - 1)
+            .expect("Device index out of bounds").clone() // This shouldn't happen
     };
 
     let data = ProgramData {
@@ -125,7 +126,8 @@ fn process_cli_args() -> Result<ProgramArgs, String> {
 
     let mut opts = getargs::Options::new(args.iter().map(String::as_str));
 
-    while let Some(opt) = opts.next_opt().expect("Error parsing arguments") {
+    while let Some(opt) = opts.next_opt()
+        .map_err(|e| format!("Error parsing arguments: {}", e))? {
 
         match opt {
             getargs::Opt::Short('a') | getargs::Opt::Long("add-command") => {
@@ -193,13 +195,13 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     let is_running_copy = is_running.clone();
     ctrlc::set_handler(move || {
         is_running_copy.store(false, Ordering::Relaxed);
-    }).expect("Could not set handler for ctrl-c");
+    }).map_err(|e| format!("Could not set handler for ctrl-c: {}", e))?;
 
     let (_cpal_stream, sample_rate, cpal_receiver) = input::init_cpal_input_stream(input_device, is_running.clone())
     .map_err(|e| format!("Error obtaining connection to recording thread: {}", e))?;
 
     // Receiver to catch audio data from stream
-    let cpal_receiver = cpal_receiver.expect("Error obtaining connection to recording thread");
+    let cpal_receiver = cpal_receiver.ok_or(String::from("Error obtaining connection to recording thread"))?;
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
         &model_path, cpal_receiver, sample_rate, is_running.clone(), print_asr_results
@@ -207,10 +209,10 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     .map_err(|e| format!("Error obtaining connection to ASR thread: {}", e))?;
 
     let match_res = phrase_matcher::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
-    let (match_receiver, match_thread) = match_res.expect("Error obtaining connection to phrase matching thread");
+    let (match_receiver, match_thread) = match_res.map_err(|e| format!("Error obtaining connection to phrase matching thread: {}", e))?;
     
     let executor_res = execute::run_command_executor(match_receiver, executables.clone(), is_running.clone());
-    let (execute_receiver, execute_thread) = executor_res.expect("Error obtaining connection to execution thread");
+    let (execute_receiver, execute_thread) = executor_res.map_err(|e| format!("Error obtaining connection to execution thread: {}", e))?;
     
     // Main program loop
     while is_running.load(Ordering::Relaxed) {
@@ -220,7 +222,7 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
                         println!("{}", data);
                 },
                 Err(e) => {
-                    eprintln!("Error: {:?}", e);
+                    eprintln!("{}", e);
                     eprintln!("A stream error occurred. Try using a different input device?");
 
                     is_running.store(false, Ordering::SeqCst);
@@ -231,13 +233,13 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     }
 
     eprintln!("\nClosing execution thread...");
-    execute_thread.join().expect("Error occurred while closing execution thread");
+    execute_thread.join().map_err(|_| "Error occurred while closing execution thread")?;
 
     eprintln!("Closing processing thread...");
-    match_thread.join().expect("Error occurred while closing processing thread");
+    match_thread.join().map_err(|_| "Error occurred while closing processing thread")?;
 
     eprintln!("Closing ASR thread...");
-    asr_thread.join().expect("Error occurred while closing ASR thread");
+    asr_thread.join().map_err(|_| "Error occurred while closing ASR thread")?;
 
     Ok(())
 }
