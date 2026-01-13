@@ -2,14 +2,47 @@ use std::{cmp, process, sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, threa
 
 use crate::phrase_matcher::{ArgumentType, PhraseArgs, arg_type};
 
-pub type ExecuteReceiver = mpsc::Receiver<anyhow::Result<String, String>>;
+#[derive(serde::Deserialize, cmp::Eq, cmp::Ord, cmp::PartialEq, cmp::PartialOrd, Clone)]
+pub enum PhrasePosition {
+    Any, Start, Exact
+}
+
+impl serde::Serialize for PhrasePosition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        // Use snakecase representations of enum values for JSON
+        let str = match self {
+            PhrasePosition::Any => "any",
+                PhrasePosition::Start => "at_start",
+                PhrasePosition::Exact => "match_exact"
+        };
+
+        serializer.serialize_str(str)
+    }
+}
+
+impl std::fmt::Display for PhrasePosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pos = match self {
+            PhrasePosition::Any => "anywhere",
+                PhrasePosition::Start => "at the start",
+                PhrasePosition::Exact => "only exact matches"
+        };
+
+        write!(f, "{pos}")
+    }
+}
 
 #[derive(serde::Deserialize, serde::Serialize, cmp::Eq, cmp::Ord, cmp::PartialEq, cmp::PartialOrd, Clone)]
 pub struct Executable {
     pub phrase : String,
     pub command : String,
-    pub args : Vec<String>
+    pub args : Vec<String>,
+    pub phrase_position : PhrasePosition
 }
+
+pub type ExecuteReceiver = mpsc::Receiver<anyhow::Result<String, String>>;
 
 pub fn run_command_executor(match_receiver : crate::phrase_matcher::PhraseMatchReceiver, executables : Vec<crate::execute::Executable>, 
     is_running : Arc<AtomicBool>) -> anyhow::Result<(ExecuteReceiver, JoinHandle<()>)> {
@@ -105,7 +138,8 @@ fn apply_arguments(executable : &Executable, arguments : &PhraseArgs) -> anyhow:
     Ok(Executable {
         phrase: executable.phrase.clone(),
         command: executable.command.clone(),
-        args: applied_args
+        args: applied_args,
+        phrase_position: executable.phrase_position.clone()
     })
 }
 
@@ -141,4 +175,20 @@ pub fn validate_executable(executable : &Executable) -> bool {
     }
     
     true
+}
+
+pub fn print_executables(executables : &[crate::execute::Executable]) {
+    executables.iter().enumerate().for_each(|(i, ex)| {
+        println!("[{i}] {{\
+            \n    phrase: {}\
+            \n    command: {}\
+            \n    arguments: [", ex.phrase, ex.command);
+
+        ex.args.iter().for_each(|arg| {
+            println!("      {}", arg);
+        });
+
+        println!("    ]\
+            \n    match type: {}\n}}\n", ex.phrase_position);
+    });
 }

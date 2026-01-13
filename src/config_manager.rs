@@ -103,10 +103,22 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<crate::execute
 
         arg_res?;
 
+        // Position requirements
+        let phrase_position_str = ex.get("phrase_position").ok_or(String::from("Could not find 'phrase_position' data in an executables array object"))?
+        .as_str().ok_or(String::from("'phrase_position' data in executables array should have been a string type"))?;
+
+        let phrase_position = match phrase_position_str {
+            "any" => crate::execute::PhrasePosition::Any,
+            "at_start" => crate::execute::PhrasePosition::Start,
+            "match_exact" => crate::execute::PhrasePosition::Exact,
+            _ => Err(String::from("Invalid phrase_position type encountered. Should have been 'any', 'at_start', or 'match_exact'"))?
+        };
+
         Ok(crate::execute::Executable {
             phrase,
             command,
-            args
+            args,
+            phrase_position
         })
     })
         .filter(|ex| { // Remove executables that produced errors
@@ -175,10 +187,36 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
         pop_newlines(&mut arg);
     }
 
+    println!("In what circumstances should this command be executed?");
+    println!("  [1] When the phrase is said at any point in a sentence\
+        \n  [2] When the phrase is said at the start of a sentence\
+        \n  [3] When the phrase exactly matches the sentence");
+    println!("Your choice (1 - 3):");
+
+    let mut phrase_pos_input = String::new();
+    std::io::stdin().read_line(&mut phrase_pos_input).map_err(|e| e.to_string())?;
+    pop_newlines(&mut phrase_pos_input);
+
+    println!();
+
+    let i : i32 = phrase_pos_input.parse().unwrap_or(-1);
+
+    let phrase_position = if (1..=3).contains(&i) {
+        [
+            crate::execute::PhrasePosition::Any, 
+            crate::execute::PhrasePosition::Start,
+            crate::execute::PhrasePosition::Exact
+        ][(i - 1) as usize].to_owned()
+    }
+    else {
+        return Err(String::from("Invalid option"));
+    };
+
     let executable = crate::execute::Executable {
         phrase,
         command,
-        args
+        args,
+        phrase_position
     };
 
     executables.push(executable);
@@ -194,7 +232,7 @@ pub fn remove_executable(executables : &mut Vec<crate::execute::Executable>) -> 
 
     println!("----- Remove a command -----");
 
-    print_executables(executables);   
+    crate::execute::print_executables(executables);   
 
     let mut index_str = String::new();
 
@@ -203,7 +241,7 @@ pub fn remove_executable(executables : &mut Vec<crate::execute::Executable>) -> 
 
     let index : i32 = index_str.trim().parse().unwrap_or(-1);
 
-    if index >= 0 && index < executables.len() as i32 {
+    if (0..executables.len() as i32).contains(&index) {
         executables.remove(index as usize);
         println!("Removing executable at index [{}]", index);
     }
@@ -242,19 +280,4 @@ pub fn write_executables(executables : Vec<crate::execute::Executable>, phrases_
         .map_err(|e| format!("Error writing phrases to file: {}", e))?;
 
     Ok(())
-}
-
-fn print_executables(executables : &[crate::execute::Executable]) {
-    executables.iter().enumerate().for_each(|(i, ex)| {
-        println!("[{i}] {{\
-            \n    phrase: {}\
-            \n    command: {}\
-            \n    arguments: [", ex.phrase, ex.command);
-
-        ex.args.iter().for_each(|arg| {
-            println!("      {}", arg);
-        });
-
-        println!("    ]\n}}\n");
-    });
 }

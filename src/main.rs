@@ -206,10 +206,10 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     )
     .map_err(|e| format!("Error obtaining connection to ASR thread: {}", e))?;
 
-    let match_res = phrase_matcher::run_phrase_matcher(asr_receiver, &executables, is_running.clone());
+    let match_res = phrase_matcher::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
     let (match_receiver, match_thread) = match_res.expect("Error obtaining connection to phrase matching thread");
     
-    let executor_res = execute::run_command_executor(match_receiver, executables, is_running.clone());
+    let executor_res = execute::run_command_executor(match_receiver, executables.clone(), is_running.clone());
     let (execute_receiver, execute_thread) = executor_res.expect("Error obtaining connection to execution thread");
     
     // Main program loop
@@ -261,7 +261,8 @@ fn print_help() {
 
 fn check_device_index(i : i32, input_devices : &[cpal::Device]) -> Result<usize, String> {
 
-    if i < 0 || i > input_devices.len() as i32 { // 0 = default, 1 - len() = specific device
+    // 0 = default, 1 to len() = specific device
+    if !(0..=input_devices.len() as i32).contains(&i) {
         return Err(String::from("Error: Invalid device index"));
     }
 

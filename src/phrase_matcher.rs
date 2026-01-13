@@ -12,10 +12,11 @@ pub struct PhraseArgs {
 
 pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs), String>>;
 
-pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, String>>, executables : &[crate::execute::Executable], is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
+pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, String>>, executables : Vec<crate::execute::Executable>, is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
     
-    let phrases = executables.iter().map(|ex| ex.phrase.clone())
-        .collect::<Vec<String>>();
+    // let phrases = executables.iter().map(|ex| ex.phrase.clone())
+        // .collect::<Vec<String>>();
+    // let executables = executables.clone();
 
     let (sender, receiver) = mpsc::channel();
 
@@ -31,8 +32,8 @@ pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, S
                         };
 
                         // Find a matching phrase and get any wildcard arguments
-                        let phrase_match_result = phrases.iter().enumerate().find(|(_, phrase)| {
-                            let (phrase_matches, temp_phrase_args) = match_phrase(&data, phrase);
+                        let phrase_match_result = executables.iter().enumerate().find(|(_, ex)| {
+                            let (phrase_matches, temp_phrase_args) = match_phrase(&data, ex);
 
                             if phrase_matches {
                                phrase_args = temp_phrase_args;
@@ -58,24 +59,24 @@ pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, S
     Ok((receiver, matcher_thread))
 }
 
-fn match_phrase(input : &str, phrase : &str) -> (bool, PhraseArgs) {
+fn match_phrase(input : &str, executable : &crate::execute::Executable) -> (bool, PhraseArgs) {
     let mut phrase_args = PhraseArgs {
         wildcard_args : vec!(),
         list_args : None
     };
 
-    let phrase_parts = phrase.split(' ').map(String::from).collect::<Vec<String>>();
+    let phrase_parts = executable.phrase.split(' ').map(String::from).collect::<Vec<String>>();
     let words = input.split(' ').map(String::from).collect::<Vec<String>>();
+    
+    // For exact matches, phrase word length should be equal to sentence word length, unless the
+    // phrase uses a wildcard, in which case Exact will behave like Start
+    if executable.phrase_position == crate::execute::PhrasePosition::Exact 
+    && phrase_parts.len() != words.len() && !executable.phrase.ends_with("...>") {
+        return (false, phrase_args);
+    }
 
-    // Find indices of spoken words that may match the start of the given phrase
-    let start_points = words.iter().enumerate().filter_map(|(i, word)| { 
-        if **word == phrase_parts[0]  {
-             Some(i)
-        }
-        else {
-            None
-        }
-    }).collect::<Vec<usize>>();
+    // Get points in the sentence where the phrase could start
+    let start_points = get_start_points(&words, &phrase_parts, &executable.phrase_position);
 
     if start_points.is_empty() {
         return (false, phrase_args);
@@ -119,6 +120,29 @@ fn match_phrase(input : &str, phrase : &str) -> (bool, PhraseArgs) {
     }
 
     (phrase_matches, phrase_args)
+}
+
+// Find indices of spoken words that may match the start of the given phrase
+fn get_start_points(words : &[String], phrase_parts : &[String], phrase_pos : &crate::execute::PhrasePosition) -> Vec<usize> {
+    if *phrase_pos == crate::execute::PhrasePosition::Any {
+        words.iter().enumerate().filter_map(|(i, word)| { 
+            if **word == phrase_parts[0] {
+                Some(i)
+            }
+            else {
+                None
+            }
+        }).collect::<Vec<usize>>()
+    }
+    else {
+        // We only need to check the first word
+        if let Some(start) = words.first() && *start == phrase_parts[0] {
+            vec!(0)
+        }
+        else {
+            vec!()
+        }
+    }
 }
 
 pub fn arg_type(arg : &str) -> ArgumentType {
