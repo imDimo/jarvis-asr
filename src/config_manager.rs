@@ -1,4 +1,7 @@
-use std::{fs, path};
+use std::{
+    fs,
+    path
+};
 use crate::execute;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -9,8 +12,9 @@ struct PhrasesStruct {
 pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
     let project_dirs = directories::ProjectDirs::from("com", "imdimo", "jarvis-asr");
 
-    let config_path = project_dirs.ok_or(String::from("Could not obtain location of project config directory. Is your home set?"))?
-    .config_dir().to_owned();
+    let config_path = project_dirs
+        .ok_or(String::from("Could not obtain location of project config directory. Is your home set?"))?
+        .config_dir().to_owned();
 
     let config_path_exists = config_path.try_exists()
         .map_err(|e| format!("Failed to verify existence of config directory path {} {}", config_path.to_string_lossy(), e))?;
@@ -59,10 +63,13 @@ pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute:
     let phrase_data : serde_json::Value = serde_json::from_str(&phrase_file_contents)
         .map_err(|e| format!("Failed to parse JSON data from file {}", e))?;
 
-    let root_obj = phrase_data.as_object().ok_or(String::from("JSON root must be an object"))?;
+    let root_obj = phrase_data.as_object()
+        .ok_or(String::from("JSON root must be an object"))?;
 
-    let executables_arr = root_obj.get("executables").ok_or(String::from("Expected 'executables' in root JSON object"))?
-    .as_array().ok_or(String::from("Expected 'executables' to be array type"))?;
+    let executables_arr = root_obj.get("executables")
+        .ok_or(String::from("Expected 'executables' in root JSON object"))?
+        .as_array()
+        .ok_or(String::from("Expected 'executables' to be array type"))?;
     
     let mut executables = get_executables(executables_arr);
 
@@ -76,19 +83,25 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
 
     executables_arr.iter().map(|ex| {
         // Get phrase
-        let phrase = ex.get("phrase").ok_or(String::from("Could not find 'phrase' data in an executables array object"))?
-        .as_str().ok_or(String::from("'phrase' data in executables array should have been a string type"))?
-        .to_lowercase();
+        let phrase = ex.get("phrase")
+            .ok_or(String::from("Could not find 'phrase' data in an executables array object"))?
+            .as_str()
+            .ok_or(String::from("'phrase' data in executables array should have been a string type"))?
+            .to_lowercase();
 
         // Get command
-        let command = ex.get("command").ok_or(String::from("Could not find 'command' data in an executables array object"))?
-        .as_str().ok_or(String::from("'command' data in executables array object should have been a string type"))?
-        .to_owned();
+        let command = ex.get("command")
+            .ok_or(String::from("Could not find 'command' data in an executables array object"))?
+            .as_str()
+            .ok_or(String::from("'command' data in executables array object should have been a string type"))?
+            .to_owned();
 
         // Get arguments
-        let args_arr = ex.get("args").ok_or(String::from("Could not find 'args' data in an executables array object"))?
-        .as_array().ok_or(String::from("'args' data in executables array should have been an array type"))?
-        .to_owned();
+        let args_arr = ex.get("args")
+            .ok_or(String::from("Could not find 'args' data in an executables array object"))?
+            .as_array()
+            .ok_or(String::from("'args' data in executables array should have been an array type"))?
+            .to_owned();
 
         let mut arg_res : Result<(), String> = Ok(());
 
@@ -105,8 +118,10 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
         arg_res?;
 
         // Position requirements
-        let phrase_position_str = ex.get("phrase_position").ok_or(String::from("Could not find 'phrase_position' data in an executables array object"))?
-        .as_str().ok_or(String::from("'phrase_position' data in executables array should have been a string type"))?;
+        let phrase_position_str = ex.get("phrase_position")
+            .ok_or(String::from("Could not find 'phrase_position' data in an executables array object"))?
+            .as_str()
+            .ok_or(String::from("'phrase_position' data in executables array should have been a string type"))?;
 
         let phrase_position = match phrase_position_str {
             "any" => execute::PhrasePosition::Any,

@@ -4,7 +4,10 @@ mod asr_handler;
 mod phrase_matcher;
 mod execute;
 
-use std::{path, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+use std::{
+    path, 
+    sync::{Arc, atomic::{AtomicBool, Ordering}}
+};
 
 use config_manager as config;
 use phrase_matcher as pm;
@@ -174,7 +177,8 @@ fn check_arg_compatibility(program_args : &ProgramArgs) -> Result<(), String> {
     let err = Err(String::from("Incompatible combination of arguments"));
 
     if program_args.add_command && (program_args.remove_command || program_args.query_devices 
-    || program_args.print_asr_results || program_args.model_path.is_some() || program_args.input_device_index_str.is_some()) {
+    || program_args.print_asr_results || program_args.model_path.is_some()
+    || program_args.input_device_index_str.is_some()) {
         return err;
     }
 
@@ -206,7 +210,8 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     .map_err(|e| format!("Error obtaining connection to recording thread: {}", e))?;
 
     // Receiver to catch audio data from stream
-    let cpal_receiver = cpal_receiver.ok_or(String::from("Error obtaining connection to recording thread"))?;
+    let cpal_receiver = cpal_receiver
+        .ok_or(String::from("Error obtaining connection to recording thread"))?;
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
         &model_path, cpal_receiver, sample_rate, is_running.clone(), print_asr_results

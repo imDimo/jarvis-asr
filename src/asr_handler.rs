@@ -1,12 +1,19 @@
-use std::{path, sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, thread::{self, JoinHandle}};
+use std::{
+    path,
+    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc},
+    thread::{self, JoinHandle}
+};
 use vosk::{DecodingState, Model, Recognizer};
+
+use crate::input;
 
 pub const RECOGNIZER_MAX_ALTERNATIVES : u16 = 0;
 pub const DATA_CHUNKS : usize = 100;
 
 pub type AsrReceiverResult = mpsc::Receiver<anyhow::Result<String, String>>;
 
-pub fn run_asr(model_path : &path::Path, cpal_receiver : mpsc::Receiver<anyhow::Result<Vec<i16>, String>>, sample_rate : u32, is_running : Arc<AtomicBool>, print_results : bool) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>), String> {
+pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResult, sample_rate : u32,
+    is_running : Arc<AtomicBool>, print_results : bool) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>), String> {
 
     // Sender and receiver to communicate text data
     let (sender, receiver) = mpsc::channel();

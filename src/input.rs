@@ -1,13 +1,17 @@
+use std::{
+    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::Receiver}
+};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::Receiver}};
 
 pub fn get_cpal_default_input_device() -> Result<cpal::Device, String> {
-    cpal::default_host().default_input_device().ok_or(String::from("No default input device available"))
+    cpal::default_host().default_input_device()
+        .ok_or(String::from("No default input device available"))
 }
 
-pub type CpalReceiverResult = Option<Receiver<anyhow::Result<Vec<i16>, String>>>;
+pub type CpalReceiverResult = Receiver<anyhow::Result<Vec<i16>, String>>;
 
-pub fn init_cpal_input_stream(input_dev : cpal::Device, is_running : Arc<AtomicBool>) -> Result<(cpal::Stream, u32, CpalReceiverResult), String> {
+pub fn init_cpal_input_stream(input_dev : cpal::Device,
+    is_running : Arc<AtomicBool>) -> Result<(cpal::Stream, u32, Option<CpalReceiverResult>), String> {
 
     eprintln!("Using input device: {}\n", input_dev.description().unwrap().name());
     

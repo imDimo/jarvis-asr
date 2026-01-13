@@ -1,4 +1,9 @@
-use std::{cmp, process, sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, thread::{self, JoinHandle}};
+use std::{
+    cmp,
+    process,
+    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, 
+    thread::{self, JoinHandle}
+};
 
 use crate::{execute, phrase_matcher as pm};
 
@@ -14,8 +19,8 @@ impl serde::Serialize for PhrasePosition {
         // Use snakecase representations of enum values for JSON
         let str = match self {
             PhrasePosition::Any => "any",
-                PhrasePosition::Start => "at_start",
-                PhrasePosition::Exact => "match_exact"
+            PhrasePosition::Start => "at_start",
+            PhrasePosition::Exact => "match_exact"
         };
 
         serializer.serialize_str(str)
@@ -26,8 +31,8 @@ impl std::fmt::Display for PhrasePosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let pos = match self {
             PhrasePosition::Any => "anywhere",
-                PhrasePosition::Start => "at the start",
-                PhrasePosition::Exact => "only exact matches"
+            PhrasePosition::Start => "at the start",
+            PhrasePosition::Exact => "only exact matches"
         };
 
         write!(f, "{pos}")
@@ -108,10 +113,13 @@ fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> any
     let mut wildcard_args = arguments.wildcard_args.clone();
     let list_args = arguments.list_args.clone();
     
-    let num_wildcards = executable.args.iter().filter(|arg| pm::arg_type(arg) == pm::ArgumentType::Wildcard).count();
+    let num_wildcards = executable.args.iter()
+        .filter(|arg| pm::arg_type(arg) == pm::ArgumentType::Wildcard).count();
+
     let has_multi_arg = executable.args.iter().any(|arg| pm::arg_type(arg) == pm::ArgumentType::List);
 
-    if (!has_multi_arg && num_wildcards != arguments.wildcard_args.len()) || (has_multi_arg && num_wildcards > arguments.wildcard_args.len()) {
+    if (!has_multi_arg && num_wildcards != arguments.wildcard_args.len())
+    || (has_multi_arg && num_wildcards > arguments.wildcard_args.len()) {
         return Err(String::from("Argument length of phrase and executable did not match"));
     }
 
@@ -119,7 +127,8 @@ fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> any
     let mut applied_args : Vec<String> = vec!();
     executable.args.iter().for_each(|arg| {
         if pm::arg_type(arg) == pm::ArgumentType::Wildcard {
-            let wildcard_opt = wildcard_args.iter().enumerate().find(|(_index, (label, _data))| label == arg);
+            let wildcard_opt = wildcard_args.iter().enumerate()
+                .find(|(_index, (label, _data))| label == arg);
 
             if let Some((arg_index, arg_data)) = wildcard_opt {
                 applied_args.push(arg_data.1.clone());
@@ -150,21 +159,27 @@ fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> any
 pub fn validate_executable(executable : &Executable) -> bool {
 
     // Verify that there is at most one variable-length arg, at the end of the phrase
-    let mut num_list_args = executable.phrase.split(' ').filter(|str| pm::arg_type(str) == pm::ArgumentType::List).count();
+    let mut num_list_args = executable.phrase.split(' ')
+        .filter(|str| pm::arg_type(str) == pm::ArgumentType::List).count();
+
     if num_list_args > 1 || (num_list_args == 1 && !executable.phrase.ends_with("...>")) {
         eprintln!("Executable with phrase {} may only contain a singular variable-length argument, and it must be at the end of the phrase", executable.phrase);
         return false;
     }
     
     // Verify that there is at most one variable-length arg in the arguments list
-    num_list_args = executable.args.iter().filter(|arg| pm::arg_type(arg) == pm::ArgumentType::List).count();
+    num_list_args = executable.args.iter()
+        .filter(|arg| pm::arg_type(arg) == pm::ArgumentType::List)
+        .count();
+
     if num_list_args > 1 {
         eprintln!("Executable with phrase {} may only contain a singular variable-length argument in the arguments list", executable.phrase);
         return false;
     }
     
     // Verify that each argument in the arguments list matches to at least one in the phrase
-    for arg in executable.args.iter().filter(|arg| pm::arg_type(arg) != pm::ArgumentType::Default) {
+    for arg in executable.args.iter()
+        .filter(|arg| pm::arg_type(arg) != pm::ArgumentType::Default) {
         if !executable.phrase.contains(arg) {
             eprintln!("Executable with phrase \"{}\" is expected to reference argument \"{}\"", executable.phrase, arg);
             return false;
@@ -172,12 +187,13 @@ pub fn validate_executable(executable : &Executable) -> bool {
     }
 
     // Verify that each argument label in the phrase matches to at least one in the arguments list
-    for arg in executable.phrase.split(' ').filter(|str| pm::arg_type(str) != pm::ArgumentType::Default) {
+    for arg in executable.phrase.split(' ')
+        .filter(|str| pm::arg_type(str) != pm::ArgumentType::Default) {
         if !executable.args.contains(&arg.to_owned()) {
             eprintln!("Executable with phrase \"{}\" references unknown argument \"{}\"", executable.phrase, arg);
         }
     }
-    
+
     true
 }
 

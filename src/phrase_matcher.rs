@@ -1,5 +1,9 @@
-use std::{sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, thread::{self, JoinHandle}};
-use crate::execute;
+use std::{
+    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc},
+    thread::{self, JoinHandle}
+};
+
+use crate::{asr_handler as asr, execute};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ArgumentType {
@@ -13,12 +17,8 @@ pub struct PhraseArgs {
 
 pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs), String>>;
 
-pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, String>>, executables : Vec<execute::Executable>, is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
-    
-    // let phrases = executables.iter().map(|ex| ex.phrase.clone())
-        // .collect::<Vec<String>>();
-    // let executables = executables.clone();
-
+pub fn run_phrase_matcher(asr_receiver : asr::AsrReceiverResult, executables : Vec<execute::Executable>, 
+    is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
     let (sender, receiver) = mpsc::channel();
 
     let matcher_thread = thread::spawn(move || {
