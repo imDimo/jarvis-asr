@@ -15,13 +15,6 @@ pub fn init_cpal_input_stream(input_dev : cpal::Device, is_running : Arc<AtomicB
     let (sender, receiver) = std::sync::mpsc::channel();
     let err_sender = sender.clone();
 
-    // let mut config_range = input_dev.supported_input_configs().map_err(|e| e.to_string())?;
-    // let config = config_range.find(|conf| conf.channels() == 1 && conf.max_sample_rate() >= (SAMPLE_RATE as u32))
-    //    .ok_or(String::from("No config found with 1 channel and at least 16k sample rate"))?
-    //    .with_sample_rate(SAMPLE_RATE as u32);
-
-    // config_range.clone().into_iter().for_each(|conf| eprintln!("{:?}", conf));
-
     let config = input_dev.default_input_config()
     .map_err(|e| format!("Error getting default input device configuration: {}", e))?;
 
@@ -46,7 +39,9 @@ pub fn init_cpal_input_stream(input_dev : cpal::Device, is_running : Arc<AtomicB
             err_sender.send(Err(e.to_string())).ok(); 
         }, None);
 
-    let stream = stream_res.map_err(|e| format!("Error creating cpal input stream {}", e))?;
+    let stream = stream_res
+        .map_err(|e| format!("Error creating cpal input stream {}", e))?;
+
     stream.play()
     .map_err(|e| format!("Error starting clap input stream {}", e))?;
 
@@ -57,7 +52,8 @@ pub fn init_cpal_input_stream(input_dev : cpal::Device, is_running : Arc<AtomicB
 pub fn get_cpal_input_devices() -> anyhow::Result<Vec<cpal::Device>, String> {
 
     let cpal_host = cpal::default_host();
-    let input_devices = cpal_host.input_devices().map_err(|e| format!("Error querying input devices {}", e))?
+    let input_devices = cpal_host.input_devices()
+        .map_err(|e| format!("Error querying input devices {}", e))?
         .collect::<Vec<cpal::Device>>();
 
     eprintln!("Got available devices\n");

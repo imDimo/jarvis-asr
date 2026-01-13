@@ -4,8 +4,10 @@ mod asr_handler;
 mod phrase_matcher;
 mod execute;
 
-use config_manager as config;
 use std::{path, sync::{Arc, atomic::{AtomicBool, Ordering}}};
+
+use config_manager as config;
+use phrase_matcher as pm;
 
 struct ProgramArgs {
     add_command : bool,
@@ -20,7 +22,7 @@ struct ProgramArgs {
 struct ProgramData {
     input_device : cpal::Device,
     model_path : path::PathBuf,
-    executables : Vec<crate::execute::Executable>,
+    executables : Vec<execute::Executable>,
     print_asr_results : bool
 }
 
@@ -33,7 +35,7 @@ fn main() -> anyhow::Result<(), String> {
     }
 
     let phrases_path = config::init_config_directory()?;
-    let dirty_executables = crate::config::load_executables(&phrases_path)
+    let dirty_executables = config::load_executables(&phrases_path)
         .map_err(|e| format!("Error occurred while reading executable data from phrases.json {}", e))?;
 
     let mut executables = dirty_executables.iter().filter_map(|ex| { 
@@ -44,13 +46,13 @@ fn main() -> anyhow::Result<(), String> {
     eprintln!("Loaded valid executables");
 
     if program_args.add_command {
-        crate::config::add_executable(&mut executables)?;
-        crate::config::write_executables(executables, &phrases_path)?;
+        config::add_executable(&mut executables)?;
+        config::write_executables(executables, &phrases_path)?;
         return Ok(());
     }
     else if program_args.remove_command {
-        crate::config::remove_executable(&mut executables)?;
-        crate::config::write_executables(executables, &phrases_path)?;
+        config::remove_executable(&mut executables)?;
+        config::write_executables(executables, &phrases_path)?;
         return Ok(());
     }
 
@@ -77,7 +79,8 @@ fn main() -> anyhow::Result<(), String> {
     let mut model_path = program_args.model_path.map(path::PathBuf::from);
 
     if model_path.is_none() {
-        let model_path_str = std::env::var("VOSK_MODEL_PATH").map_err(|_| String::from("Missing path to VOSK model. See 'jarvis-asr --help' for proper usage"))?;
+        let model_path_str = std::env::var("VOSK_MODEL_PATH")
+            .map_err(|_| String::from("Missing path to VOSK model. See 'jarvis-asr --help' for proper usage"))?;
         model_path = Some(path::PathBuf::from(model_path_str));
     }
 
@@ -134,14 +137,16 @@ fn process_cli_args() -> Result<ProgramArgs, String> {
                 program_args.add_command = true;
             }
             getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
-                let arg_m = opts.value().map_err(|e| e.to_string())?;
+                let arg_m = opts.value()
+                    .map_err(|e| e.to_string())?;
                 program_args.input_device_index_str = Some(arg_m.to_owned());
             },
             getargs::Opt::Short('h') | getargs::Opt::Long("help") => {
                 program_args.help = true;
             },
             getargs::Opt::Short('m') | getargs::Opt::Long("model") => {
-                let arg_m = opts.value().map_err(|e| e.to_string())?;
+                let arg_m = opts.value()
+                    .map_err(|e| e.to_string())?;
                 program_args.model_path = Some(arg_m.to_owned());
             },
             getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
@@ -205,14 +210,15 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
         &model_path, cpal_receiver, sample_rate, is_running.clone(), print_asr_results
-    )
-    .map_err(|e| format!("Error obtaining connection to ASR thread: {}", e))?;
+    ).map_err(|e| format!("Error obtaining connection to ASR thread: {}", e))?;
 
-    let match_res = phrase_matcher::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
-    let (match_receiver, match_thread) = match_res.map_err(|e| format!("Error obtaining connection to phrase matching thread: {}", e))?;
+    let match_res = pm::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
+    let (match_receiver, match_thread) = match_res
+        .map_err(|e| format!("Error obtaining connection to phrase matching thread: {}", e))?;
     
     let executor_res = execute::run_command_executor(match_receiver, executables.clone(), is_running.clone());
-    let (execute_receiver, execute_thread) = executor_res.map_err(|e| format!("Error obtaining connection to execution thread: {}", e))?;
+    let (execute_receiver, execute_thread) = executor_res
+        .map_err(|e| format!("Error obtaining connection to execution thread: {}", e))?;
     
     // Main program loop
     while is_running.load(Ordering::Relaxed) {
@@ -233,13 +239,16 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     }
 
     eprintln!("\nClosing execution thread...");
-    execute_thread.join().map_err(|_| "Error occurred while closing execution thread")?;
+    execute_thread.join()
+        .map_err(|_| "Error occurred while closing execution thread")?;
 
     eprintln!("Closing processing thread...");
-    match_thread.join().map_err(|_| "Error occurred while closing processing thread")?;
+    match_thread.join()
+        .map_err(|_| "Error occurred while closing processing thread")?;
 
     eprintln!("Closing ASR thread...");
-    asr_thread.join().map_err(|_| "Error occurred while closing ASR thread")?;
+    asr_thread.join()
+        .map_err(|_| "Error occurred while closing ASR thread")?;
 
     Ok(())
 }

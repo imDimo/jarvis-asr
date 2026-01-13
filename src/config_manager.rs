@@ -1,8 +1,9 @@
 use std::{fs, path};
+use crate::execute;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 struct PhrasesStruct {
-    executables: Vec<crate::execute::Executable>
+    executables: Vec<execute::Executable>
 }
 
 pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
@@ -41,7 +42,7 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
     Ok(config_path.to_owned())
 }
 
-pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<crate::execute::Executable>, String> {
+pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>, String> {
 
     let phrases_file_path = &phrase_dir.join(path::Path::new("phrases.json"));
 
@@ -71,7 +72,7 @@ pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<crate::e
     Ok(executables)
 }
 
-fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<crate::execute::Executable> {
+fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Executable> {
 
     executables_arr.iter().map(|ex| {
         // Get phrase
@@ -108,13 +109,13 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<crate::execute
         .as_str().ok_or(String::from("'phrase_position' data in executables array should have been a string type"))?;
 
         let phrase_position = match phrase_position_str {
-            "any" => crate::execute::PhrasePosition::Any,
-            "at_start" => crate::execute::PhrasePosition::Start,
-            "match_exact" => crate::execute::PhrasePosition::Exact,
+            "any" => execute::PhrasePosition::Any,
+            "at_start" => execute::PhrasePosition::Start,
+            "match_exact" => execute::PhrasePosition::Exact,
             _ => Err(String::from("Invalid phrase_position type encountered. Should have been 'any', 'at_start', or 'match_exact'"))?
         };
 
-        Ok(crate::execute::Executable {
+        Ok(execute::Executable {
             phrase,
             command,
             args,
@@ -130,11 +131,11 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<crate::execute
                 }
             }
         })
-        .map(|ex : Result<crate::execute::Executable, String>| ex.unwrap()) // Get executables from results
-        .collect::<Vec<crate::execute::Executable>>()
+        .map(|ex : Result<execute::Executable, String>| ex.unwrap()) // Get executables from results
+        .collect::<Vec<execute::Executable>>()
 }
 
-pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Result<(), String> {
+pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(), String> {
     println!("----- Add a command -----");
 
     let mut phrase = String::new();
@@ -154,7 +155,8 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
     println!("Leave input empty to cancel");
 
     println!("Phrase:");
-    std::io::stdin().read_line(&mut phrase).map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut phrase)
+        .map_err(|e| e.to_string())?;
     
     pop_newlines(&mut phrase);
 
@@ -163,7 +165,8 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
     }
 
     println!("Command:");
-    std::io::stdin().read_line(&mut command).map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut command)
+        .map_err(|e| e.to_string())?;
 
     pop_newlines(&mut command);
 
@@ -172,7 +175,8 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
     }
 
     println!("Arguments (Enter one at a time, leave empty to finish):");
-    std::io::stdin().read_line(&mut arg).map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut arg)
+        .map_err(|e| e.to_string())?;
     arg = arg.trim().to_owned();
     
     pop_newlines(&mut arg);
@@ -181,7 +185,8 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
         args.push(arg.clone());
         arg.clear();
         
-        std::io::stdin().read_line(&mut arg).map_err(|e| e.to_string())?;
+        std::io::stdin().read_line(&mut arg)
+            .map_err(|e| e.to_string())?;
         arg = arg.trim().to_owned();
 
         pop_newlines(&mut arg);
@@ -194,7 +199,8 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
     println!("Your choice (1 - 3):");
 
     let mut phrase_pos_input = String::new();
-    std::io::stdin().read_line(&mut phrase_pos_input).map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut phrase_pos_input)
+        .map_err(|e| e.to_string())?;
     pop_newlines(&mut phrase_pos_input);
 
     println!();
@@ -203,16 +209,16 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
 
     let phrase_position = if (1..=3).contains(&i) {
         [
-            crate::execute::PhrasePosition::Any, 
-            crate::execute::PhrasePosition::Start,
-            crate::execute::PhrasePosition::Exact
+            execute::PhrasePosition::Any, 
+            execute::PhrasePosition::Start,
+            execute::PhrasePosition::Exact
         ][(i - 1) as usize].to_owned()
     }
     else {
         return Err(String::from("Invalid option"));
     };
 
-    let executable = crate::execute::Executable {
+    let executable = execute::Executable {
         phrase,
         command,
         args,
@@ -224,7 +230,7 @@ pub fn add_executable(executables : &mut Vec<crate::execute::Executable>) -> Res
     Ok(())
 }
 
-pub fn remove_executable(executables : &mut Vec<crate::execute::Executable>) -> Result<(), String> {
+pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> Result<(), String> {
     
     if executables.is_empty() {
         return Err(String::from("No executables to be removed"));
@@ -232,12 +238,13 @@ pub fn remove_executable(executables : &mut Vec<crate::execute::Executable>) -> 
 
     println!("----- Remove a command -----");
 
-    crate::execute::print_executables(executables);   
+    execute::print_executables(executables);   
 
     let mut index_str = String::new();
 
     println!("Index to remove: ");
-    std::io::stdin().read_line(&mut index_str).map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut index_str)
+        .map_err(|e| e.to_string())?;
 
     let index : i32 = index_str.trim().parse().unwrap_or(-1);
 
@@ -252,7 +259,7 @@ pub fn remove_executable(executables : &mut Vec<crate::execute::Executable>) -> 
     Ok(())
 }
 
-pub fn write_executables(executables : Vec<crate::execute::Executable>, phrases_dir : &path::Path) -> Result<(), String> {
+pub fn write_executables(executables : Vec<execute::Executable>, phrases_dir : &path::Path) -> Result<(), String> {
     let phrases_file_path = &phrases_dir.join(path::Path::new("phrases.json"));
 
     let phrases_file_exists = if let Ok(exists) = phrases_file_path.try_exists() {

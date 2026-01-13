@@ -1,4 +1,5 @@
 use std::{sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc}, thread::{self, JoinHandle}};
+use crate::execute;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ArgumentType {
@@ -12,7 +13,7 @@ pub struct PhraseArgs {
 
 pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs), String>>;
 
-pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, String>>, executables : Vec<crate::execute::Executable>, is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
+pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, String>>, executables : Vec<execute::Executable>, is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
     
     // let phrases = executables.iter().map(|ex| ex.phrase.clone())
         // .collect::<Vec<String>>();
@@ -59,7 +60,7 @@ pub fn run_phrase_matcher(asr_receiver : mpsc::Receiver<anyhow::Result<String, S
     Ok((receiver, matcher_thread))
 }
 
-fn match_phrase(input : &str, executable : &crate::execute::Executable) -> (bool, PhraseArgs) {
+fn match_phrase(input : &str, executable : &execute::Executable) -> (bool, PhraseArgs) {
     let mut phrase_args = PhraseArgs {
         wildcard_args : vec!(),
         list_args : None
@@ -70,7 +71,7 @@ fn match_phrase(input : &str, executable : &crate::execute::Executable) -> (bool
     
     // For exact matches, phrase word length should be equal to sentence word length, unless the
     // phrase uses a wildcard, in which case Exact will behave like Start
-    if executable.phrase_position == crate::execute::PhrasePosition::Exact 
+    if executable.phrase_position == execute::PhrasePosition::Exact 
     && phrase_parts.len() != words.len() && !executable.phrase.ends_with("...>") {
         return (false, phrase_args);
     }
@@ -123,8 +124,8 @@ fn match_phrase(input : &str, executable : &crate::execute::Executable) -> (bool
 }
 
 // Find indices of spoken words that may match the start of the given phrase
-fn get_start_points(words : &[String], phrase_parts : &[String], phrase_pos : &crate::execute::PhrasePosition) -> Vec<usize> {
-    if *phrase_pos == crate::execute::PhrasePosition::Any {
+fn get_start_points(words : &[String], phrase_parts : &[String], phrase_pos : &execute::PhrasePosition) -> Vec<usize> {
+    if *phrase_pos == execute::PhrasePosition::Any {
         words.iter().enumerate().filter_map(|(i, word)| { 
             if **word == phrase_parts[0] {
                 Some(i)
