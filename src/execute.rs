@@ -199,10 +199,10 @@ pub fn validate_executable(executable : &Executable) -> bool {
 
 pub fn print_executables(executables : &[crate::execute::Executable]) {
     executables.iter().enumerate().for_each(|(i, ex)| {
-        println!("[{i}] {{\
+        println!("[{}] {{\
             \n    phrase: {}\
             \n    command: {}\
-            \n    arguments: [", ex.phrase, ex.command);
+            \n    arguments: [", i + 1, ex.phrase, ex.command);
 
         ex.args.iter().for_each(|arg| {
             println!("      {}", arg);

@@ -263,9 +263,9 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> Result<
 
     let index : i32 = index_str.trim().parse().unwrap_or(-1);
 
-    if (0..executables.len() as i32).contains(&index) {
-        executables.remove(index as usize);
+    if (1..=executables.len() as i32).contains(&index) {
         println!("Removing executable at index [{}]", index);
+        executables.remove((index - 1) as usize);
     }
     else {
         return Err(String::from("Invalid index"));
