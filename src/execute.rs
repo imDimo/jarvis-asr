@@ -31,7 +31,7 @@ impl std::fmt::Display for PhrasePosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let pos = match self {
             PhrasePosition::Any => "anywhere",
-            PhrasePosition::Start => "at the start",
+            PhrasePosition::Start => "at start",
             PhrasePosition::Exact => "only exact matches"
         };
 
@@ -199,16 +199,24 @@ pub fn validate_executable(executable : &Executable) -> bool {
 
 pub fn print_executables(executables : &[crate::execute::Executable]) {
     executables.iter().enumerate().for_each(|(i, ex)| {
-        println!("[{}] {{\
-            \n    phrase: {}\
-            \n    command: {}\
-            \n    arguments: [", i + 1, ex.phrase, ex.command);
+        print!("[{}] {{\
+            \n        phrase: {}\
+            \n        command: {}\
+            \n        arguments: [", i + 1, ex.phrase, ex.command);
 
-        ex.args.iter().for_each(|arg| {
-            println!("      {}", arg);
-        });
+        if ex.args.is_empty() {
+            println!("]");
+        }
+        else {
+            println!();
 
-        println!("    ]\
-            \n    match type: {}\n}}\n", ex.phrase_position);
+            ex.args.iter().for_each(|arg| {
+                println!("            {}", arg);
+            });
+
+            println!("        ]");
+        }
+
+        println!("        match type: {}\n    }}\n", ex.phrase_position);
     });
 }

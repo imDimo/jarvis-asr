@@ -207,10 +207,10 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
         pop_newlines(&mut arg);
     }
 
-    println!("In what circumstances should this command be executed?");
+    println!("When should this command be executed?");
     println!("  [1] When the phrase is said at any point in a sentence\
         \n  [2] When the phrase is said at the start of a sentence\
-        \n  [3] When the phrase exactly matches the sentence");
+        \n  [3] When the phrase exactly matches a sentence");
     println!("Your choice (1 - 3):");
 
     let mut phrase_pos_input = String::new();
@@ -218,7 +218,9 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
         .map_err(|e| e.to_string())?;
     pop_newlines(&mut phrase_pos_input);
 
-    println!();
+    if phrase_pos_input.is_empty() {
+        return Ok(());
+    }
 
     let i : i32 = phrase_pos_input.parse().unwrap_or(-1);
 
