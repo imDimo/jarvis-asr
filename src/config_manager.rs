@@ -17,7 +17,7 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
         .config_dir().to_owned();
 
     let config_path_exists = config_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of config directory path {} {}", config_path.to_string_lossy(), e))?;
+        .map_err(|e| format!("Failed to verify existence of config directory path '{}': {}", config_path.to_string_lossy(), e))?;
 
     if !config_path_exists {
         fs::create_dir_all(&config_path)
@@ -27,11 +27,11 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
     let phrases_file_path = &config_path.join(path::Path::new("phrases.json"));
 
     let phrases_file_exists = phrases_file_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of phrase config path {} {}", phrases_file_path.to_string_lossy(), e))?;
+        .map_err(|e| format!("Failed to verify existence of phrase config path '{}' {}", phrases_file_path.to_string_lossy(), e))?;
 
     if !phrases_file_exists {
         let phrases_file = fs::File::create(phrases_file_path)
-            .map_err(|e| format!("Error initializing phrases file {}", e))?;
+            .map_err(|e| format!("Error initializing phrases file: {}", e))?;
 
         // Write initial JSON data
         let phrases_file_structure = PhrasesStruct {
@@ -40,7 +40,7 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
 
         let writer = std::io::BufWriter::new(phrases_file);
         serde_json::to_writer(writer, &phrases_file_structure)
-            .map_err(|e| format!("Error initializing phrases file {}", e))?;
+            .map_err(|e| format!("Error initializing phrases file: {}", e))?;
     }
 
     Ok(config_path.to_owned())
@@ -51,17 +51,17 @@ pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute:
     let phrases_file_path = &phrase_dir.join(path::Path::new("phrases.json"));
 
     let phrases_file_exists = phrases_file_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of phrase data path {} {}", phrases_file_path.to_string_lossy(), e))?;
+        .map_err(|e| format!("Failed to verify existence of phrase data path '{}': {}", phrases_file_path.to_string_lossy(), e))?;
 
     if !phrases_file_exists {
         return Err(format!("Phrases config directory '{}' does not exist", phrases_file_path.to_string_lossy()));
     }
 
     let phrase_file_contents = fs::read_to_string(phrases_file_path)
-        .map_err(|e| format!("Failed to read file contents {}", e))?;
+        .map_err(|e| format!("Failed to read file contents: {}", e))?;
 
     let phrase_data : serde_json::Value = serde_json::from_str(&phrase_file_contents)
-        .map_err(|e| format!("Failed to parse JSON data from file {}", e))?;
+        .map_err(|e| format!("Failed to parse JSON data from file: {}", e))?;
 
     let root_obj = phrase_data.as_object()
         .ok_or(String::from("JSON root must be an object"))?;
