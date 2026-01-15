@@ -24,44 +24,44 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf> {
             .context(format!("Failed to create config directory '{}'", config_path.to_string_lossy()))?
     }
 
-    let phrases_file_path = &config_path.join(path::Path::new("phrases.json"));
+    let commands_file_path = &config_path.join(path::Path::new("commands.json"));
 
-    let phrases_file_exists = phrases_file_path.try_exists()
-        .context(format!("Failed to verify existence of phrase config path '{}'", phrases_file_path.to_string_lossy()))?;
+    let commands_file_exists = commands_file_path.try_exists()
+        .context(format!("Failed to verify existence of commands config path '{}'", commands_file_path.to_string_lossy()))?;
 
-    if !phrases_file_exists {
-        let phrases_file = fs::File::create(phrases_file_path)
-            .context("Error initializing phrases config file")?;
+    if !commands_file_exists {
+        let commands_file = fs::File::create(commands_file_path)
+            .context("Error initializing commands config file")?;
 
         // Write initial JSON data
-        let phrases_file_structure = PhrasesStruct {
+        let commands_file_structure = PhrasesStruct {
             executables: vec!()
         };
 
-        let writer = std::io::BufWriter::new(phrases_file);
-        serde_json::to_writer(writer, &phrases_file_structure)
-            .context("Error initializing phrases file")?;
+        let writer = std::io::BufWriter::new(commands_file);
+        serde_json::to_writer(writer, &commands_file_structure)
+            .context("Error initializing commands file")?;
     }
 
     Ok(config_path.to_owned())
 }
 
-pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>> {
+pub fn load_executables(commands_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>> {
 
-    let phrases_file_path = &phrase_dir.join(path::Path::new("phrases.json"));
+    let commands_file_path = &commands_dir.join(path::Path::new("commands.json"));
 
-    let phrases_file_exists = phrases_file_path.try_exists()
-        .context(format!("Failed to verify existence of phrase data path '{}'", phrases_file_path.to_string_lossy()))?;
+    let commands_file_exists = commands_file_path.try_exists()
+        .context(format!("Failed to verify existence of command data path '{}'", commands_file_path.to_string_lossy()))?;
     
-    anyhow::ensure!(phrases_file_exists, format!("Phrases config directory '{}' does not exist", phrases_file_path.to_string_lossy()));
+    anyhow::ensure!(commands_file_exists, format!("Commands config directory '{}' does not exist", commands_file_path.to_string_lossy()));
 
-    let phrase_file_contents = fs::read_to_string(phrases_file_path)
-        .context("Failed to read contents of phrases config file")?;
+    let command_file_contents = fs::read_to_string(commands_file_path)
+        .context("Failed to read contents of commands config file")?;
 
-    let phrase_data : serde_json::Value = serde_json::from_str(&phrase_file_contents)
-        .context("Failed to parse JSON data from phrases.json file")?;
+    let command_data : serde_json::Value = serde_json::from_str(&command_file_contents)
+        .context("Failed to parse JSON data from commands.json file")?;
 
-    let root_obj = phrase_data.as_object()
+    let root_obj = command_data.as_object()
         .context(String::from("JSON root must be an object"))?;
 
     let executables_arr = root_obj.get("executables")
@@ -260,28 +260,28 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
     Ok(())
 }
 
-pub fn write_executables(executables : Vec<execute::Executable>, phrases_dir : &path::Path) -> anyhow::Result<()> {
-    let phrases_file_path = &phrases_dir.join(path::Path::new("phrases.json"));
+pub fn write_executables(executables : Vec<execute::Executable>, commands_dir : &path::Path) -> anyhow::Result<()> {
+    let commands_file_path = &commands_dir.join(path::Path::new("commands.json"));
 
-    let phrases_file_exists = phrases_file_path.try_exists()
-        .context(format!("Failed to verify existence of phrase data path {}",
-            phrases_file_path.to_string_lossy()))?;
+    let commands_file_exists = commands_file_path.try_exists()
+        .context(format!("Failed to verify existence of commands data path {}",
+            commands_file_path.to_string_lossy()))?;
 
-    anyhow::ensure!(phrases_file_exists, 
-        format!("Phrases config directory '{}' does not exist",
-        phrases_file_path.to_string_lossy()));
+    anyhow::ensure!(commands_file_exists, 
+        format!("Commands config directory '{}' does not exist",
+        commands_file_path.to_string_lossy()));
     
-    // Recreate phrases file with updated data
-    let phrases_file = fs::File::create(phrases_file_path)
-        .context(format!("Error creating file {}", phrases_file_path.to_string_lossy()))?;
+    // Recreate commands file with updated data
+    let commands_file = fs::File::create(commands_file_path)
+        .context(format!("Error creating file {}", commands_file_path.to_string_lossy()))?;
 
     // Create structure of JSON data
-    let phrases_file_structure = PhrasesStruct {
+    let commands_file_structure = PhrasesStruct {
         executables
     };
 
-    let writer = std::io::BufWriter::new(phrases_file);
-    serde_json::to_writer_pretty(writer, &phrases_file_structure)
+    let writer = std::io::BufWriter::new(commands_file);
+    serde_json::to_writer_pretty(writer, &commands_file_structure)
         .context("Error saving commands to config file")?;
 
     Ok(())
