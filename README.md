@@ -35,13 +35,13 @@ The binary will be placed in `/target/release/`
 
 For normal usage, a path to a VOSK model must be provided, either through a command-line argument `jarvis-asr -m </path/to/model/>` or by setting the environment variable `VOSK_MODEL_PATH`.
 
-A configuration file `phrases.json` maps user-defined phrases to commands and their arguments. This file is located in:
+A configuration file `commands.json` maps user-defined phrases to commands and their arguments. This file is located in:
 
 - Windows: `~/AppData/Roaming/imdimo/jarvis-asr/config/`
 
 - Linux: `~/.config/jarvis-asr/`
 
-Jarvis-ASR can be run with the `-a` or `-r` flag to add or remove these mappings through the terminal, but it may be more convenient to edit `phrases.json` by hand. As long as the JSON is properly formatted, improper executables will simply generate warnings and be ignored.
+Jarvis-ASR can be run with the `-a` or `-r` flag to add or remove these mappings through the terminal, but it may be more convenient to edit `commands.json` by hand. As long as the JSON is properly formatted, improper executables will simply generate warnings and be ignored.
 
 Run `jarvis-asr --help` to see all available arguments.
 
