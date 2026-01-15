@@ -135,7 +135,7 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
 
     loop {
         let opt_read_result = opts.next_opt();
-        anyhow::ensure!(opt_read_result.is_ok(), "Error reading CLI arguments!");
+        anyhow::ensure!(opt_read_result.is_ok(), "Could not read CLI arguments");
 
         if let Some(opt) = opt_read_result.unwrap() {
             match opt {
@@ -143,15 +143,18 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
                     program_args.add_command = true;
                 }
                 getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
-                    let arg_m = opts.value().expect("Argument 'd' expected a device index");
-                    program_args.input_device_index_str = Some(arg_m.to_owned());
+                    let arg_m = opts.value();
+                    anyhow::ensure!(arg_m.is_ok(), "Argument 'd' expected a device index");
+
+                    program_args.input_device_index_str = Some(arg_m.unwrap().to_owned());
                 },
                 getargs::Opt::Short('h') | getargs::Opt::Long("help") => {
                     program_args.help = true;
                 },
                 getargs::Opt::Short('m') | getargs::Opt::Long("model") => {
-                    let arg_m = opts.value().expect("Argument 'm' expected a model path");
-                    program_args.model_path = Some(arg_m.to_owned());
+                    let arg_m = opts.value();
+                    anyhow::ensure!(arg_m.is_ok(), "Argument 'm' expected a model path");
+                    program_args.model_path = Some(arg_m.unwrap().to_owned());
                 },
                 getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
                     program_args.print_asr_results = true;
