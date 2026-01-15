@@ -15,7 +15,7 @@ pub struct PhraseArgs {
     pub list_args : Option<(String, Vec<String>)>
 }
 
-pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs), String>>;
+pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs)>>;
 
 pub fn run_phrase_matcher(asr_receiver : asr::AsrReceiverResult, executables : Vec<execute::Executable>, 
     is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {

@@ -8,6 +8,7 @@ use std::{
     path, 
     sync::{Arc, atomic::{AtomicBool, Ordering}}
 };
+use anyhow::Context;
 
 use config_manager as config;
 use phrase_matcher as pm;
@@ -29,7 +30,7 @@ struct ProgramData {
     print_asr_results : bool
 }
 
-fn main() -> anyhow::Result<(), String> {
+fn main() -> anyhow::Result<()> {
     let program_args = process_cli_args()?;
 
     if program_args.help {
@@ -38,8 +39,7 @@ fn main() -> anyhow::Result<(), String> {
     }
 
     let phrases_path = config::init_config_directory()?;
-    let dirty_executables = config::load_executables(&phrases_path)
-        .map_err(|e| format!("Error occurred while reading executable data from phrases.json {}", e))?;
+    let dirty_executables = config::load_executables(&phrases_path)?;
 
     let mut executables = dirty_executables.iter().filter_map(|ex| { 
         if execute::validate_executable(ex) { Some(ex.clone()) }
@@ -83,7 +83,8 @@ fn main() -> anyhow::Result<(), String> {
 
     if model_path.is_none() {
         let model_path_str = std::env::var("VOSK_MODEL_PATH")
-            .map_err(|_| String::from("Missing path to VOSK model. See 'jarvis-asr --help' for proper usage"))?;
+            .context("Missing path to VOSK model. See 'jarvis-asr --help' for proper usage")?;
+
         model_path = Some(path::PathBuf::from(model_path_str));
     }
 
@@ -107,7 +108,7 @@ fn main() -> anyhow::Result<(), String> {
     match run(data) {
         Ok(_) => {},
         Err(e) => {
-            return Err(e.to_string())
+            return Err(e)
         }
     };
 
@@ -115,7 +116,7 @@ fn main() -> anyhow::Result<(), String> {
     Ok(())
 }
 
-fn process_cli_args() -> Result<ProgramArgs, String> {
+fn process_cli_args() -> anyhow::Result<ProgramArgs> {
 
     let mut program_args = ProgramArgs {
         add_command : false,
@@ -132,38 +133,45 @@ fn process_cli_args() -> Result<ProgramArgs, String> {
 
     let mut opts = getargs::Options::new(args.iter().map(String::as_str));
 
-    while let Some(opt) = opts.next_opt()
-        .map_err(|e| format!("Error parsing arguments: {}", e))? {
+    loop {
+        let opt_read_result = opts.next_opt();
+        anyhow::ensure!(opt_read_result.is_ok(), "Could not read CLI arguments");
 
-        match opt {
-            getargs::Opt::Short('a') | getargs::Opt::Long("add-command") => {
-                program_args.add_command = true;
+        if let Some(opt) = opt_read_result.unwrap() {
+            match opt {
+                getargs::Opt::Short('a') | getargs::Opt::Long("add-command") => {
+                    program_args.add_command = true;
+                }
+                getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
+                    let arg_m = opts.value();
+                    anyhow::ensure!(arg_m.is_ok(), "Argument 'd' expected a device index");
+
+                    program_args.input_device_index_str = Some(arg_m.unwrap().to_owned());
+                },
+                getargs::Opt::Short('h') | getargs::Opt::Long("help") => {
+                    program_args.help = true;
+                },
+                getargs::Opt::Short('m') | getargs::Opt::Long("model") => {
+                    let arg_m = opts.value();
+                    anyhow::ensure!(arg_m.is_ok(), "Argument 'm' expected a model path");
+                    program_args.model_path = Some(arg_m.unwrap().to_owned());
+                },
+                getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
+                    program_args.print_asr_results = true;
+                }
+                getargs::Opt::Short('q') | getargs::Opt::Long("query-devices") => {
+                    program_args.query_devices = true;
+                },
+                getargs::Opt::Short('r') | getargs::Opt::Long("remove-command") => {
+                    program_args.remove_command = true;
+                },
+                _ => {
+                    anyhow::bail!(format!("Unknown argument {:?}", opt.to_string())); 
+                }
             }
-            getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
-                let arg_m = opts.value()
-                    .map_err(|e| e.to_string())?;
-                program_args.input_device_index_str = Some(arg_m.to_owned());
-            },
-            getargs::Opt::Short('h') | getargs::Opt::Long("help") => {
-                program_args.help = true;
-            },
-            getargs::Opt::Short('m') | getargs::Opt::Long("model") => {
-                let arg_m = opts.value()
-                    .map_err(|e| e.to_string())?;
-                program_args.model_path = Some(arg_m.to_owned());
-            },
-            getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
-                program_args.print_asr_results = true;
-            }
-            getargs::Opt::Short('q') | getargs::Opt::Long("query-devices") => {
-                program_args.query_devices = true;
-            },
-            getargs::Opt::Short('r') | getargs::Opt::Long("remove-command") => {
-                program_args.remove_command = true;
-            },
-            _ => { 
-                return Err(format!("Unknown argument {:?}", opt.to_string()));
-            }
+        }
+        else {
+            break;
         }
     }
     
@@ -172,30 +180,28 @@ fn process_cli_args() -> Result<ProgramArgs, String> {
     Ok(program_args)
 }
 
-fn check_arg_compatibility(program_args : &ProgramArgs) -> Result<(), String> {
+fn check_arg_compatibility(program_args : &ProgramArgs) -> anyhow::Result<()> {
     
-    let err = Err(String::from("Incompatible combination of arguments"));
-
     if program_args.add_command && (program_args.remove_command || program_args.query_devices 
     || program_args.print_asr_results || program_args.model_path.is_some()
     || program_args.input_device_index_str.is_some()) {
-        return err;
+        anyhow::bail!("Incompatible combination of arguments");
     }
 
     if program_args.remove_command && (program_args.query_devices || program_args.print_asr_results
     || program_args.model_path.is_some() || program_args.input_device_index_str.is_some()) {
-        return err;
+        anyhow::bail!("Incompatible combination of arguments");
     }
 
     if program_args.query_devices && (program_args.print_asr_results || program_args.model_path.is_some()
     || program_args.input_device_index_str.is_some()) {
-        return err;
+        anyhow::bail!("Incompatible combination of arguments");
     }
 
     Ok(())
 }
 
-fn run(data : ProgramData) -> anyhow::Result<(), String> { 
+fn run(data : ProgramData) -> anyhow::Result<()> { 
 
     let ProgramData { input_device, model_path, executables, print_asr_results } = data;
 
@@ -204,26 +210,26 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     let is_running_copy = is_running.clone();
     ctrlc::set_handler(move || {
         is_running_copy.store(false, Ordering::Relaxed);
-    }).map_err(|e| format!("Could not set handler for ctrl-c: {}", e))?;
+    }).context("Could not set handler for ctrl-c: {}")?;
 
     let (_cpal_stream, sample_rate, cpal_receiver) = input::init_cpal_input_stream(input_device, is_running.clone())
-    .map_err(|e| format!("Error obtaining connection to recording thread: {}", e))?;
+    .context("Error obtaining connection to recording thread: {}")?;
 
     // Receiver to catch audio data from stream
     let cpal_receiver = cpal_receiver
-        .ok_or(String::from("Error obtaining connection to recording thread"))?;
+        .context("Error obtaining connection to recording thread")?;
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
         &model_path, cpal_receiver, sample_rate, is_running.clone(), print_asr_results
-    ).map_err(|e| format!("Error obtaining connection to ASR thread: {}", e))?;
+    ).context("Error obtaining connection to ASR thread: {}")?;
 
     let match_res = pm::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
     let (match_receiver, match_thread) = match_res
-        .map_err(|e| format!("Error obtaining connection to phrase matching thread: {}", e))?;
+        .context("Error obtaining connection to phrase matching thread")?;
     
     let executor_res = execute::run_command_executor(match_receiver, executables.clone(), is_running.clone());
     let (execute_receiver, execute_thread) = executor_res
-        .map_err(|e| format!("Error obtaining connection to execution thread: {}", e))?;
+        .context("Error obtaining connection to execution thread")?;
     
     // Main program loop
     while is_running.load(Ordering::Relaxed) {
@@ -244,16 +250,13 @@ fn run(data : ProgramData) -> anyhow::Result<(), String> {
     }
 
     eprintln!("\nClosing execution thread...");
-    execute_thread.join()
-        .map_err(|_| "Error occurred while closing execution thread")?;
+    execute_thread.join().expect("ASR thread panicked");
 
     eprintln!("Closing processing thread...");
-    match_thread.join()
-        .map_err(|_| "Error occurred while closing processing thread")?;
+    match_thread.join().expect("ASR thread panicked");
 
     eprintln!("Closing ASR thread...");
-    asr_thread.join()
-        .map_err(|_| "Error occurred while closing ASR thread")?;
+    asr_thread.join().expect("ASR thread panicked");
 
     Ok(())
 }
@@ -275,12 +278,9 @@ fn print_help() {
         ");
 }
 
-fn check_device_index(i : i32, input_devices : &[cpal::Device]) -> Result<usize, String> {
+fn check_device_index(i : i32, input_devices : &[cpal::Device]) -> anyhow::Result<usize> {
 
     // 0 = default, 1 to len() = specific device
-    if !(0..=input_devices.len() as i32).contains(&i) {
-        return Err(String::from("Error: Invalid device index"));
-    }
-
+    anyhow::ensure!((0..=input_devices.len() as i32).contains(&i), "Invalid device index");
     Ok(i as usize)
 }
