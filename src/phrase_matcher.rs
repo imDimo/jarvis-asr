@@ -1,5 +1,5 @@
 use std::{
-    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc},
+    sync::mpsc,
     thread::{self, JoinHandle}
 };
 
@@ -17,13 +17,13 @@ pub struct PhraseArgs {
 
 pub type PhraseMatchReceiver = mpsc::Receiver<anyhow::Result<(usize, PhraseArgs)>>;
 
-pub fn run_phrase_matcher(asr_receiver : asr::AsrReceiverResult, executables : Vec<execute::Executable>, 
-    is_running : Arc<AtomicBool>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
+pub fn run_phrase_matcher(asr_receiver : asr::AsrReceiverResult, 
+    executables : Vec<execute::Executable>) -> anyhow::Result<(PhraseMatchReceiver, JoinHandle<()>)> {
     let (sender, receiver) = mpsc::channel();
 
     let matcher_thread = thread::spawn(move || {
-        while is_running.load(Ordering::Relaxed) {
-            while let Ok(data) = asr_receiver.try_recv() {
+        loop {
+            if let Ok(data) = asr_receiver.recv() {
                 match data {
                     Ok(data) => {
                         // Wildcard arguments given in the phrase
@@ -53,6 +53,10 @@ pub fn run_phrase_matcher(asr_receiver : asr::AsrReceiverResult, executables : V
                         return;
                     }
                 }
+            }
+            else { // Senders have dropped
+                eprintln!("Phrase match thread exited!");
+                return;
             }
         }
     });
