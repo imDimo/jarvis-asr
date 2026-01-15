@@ -1,6 +1,6 @@
-use std::{
-    sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc::Receiver}
-};
+use std::
+    sync::mpsc::Receiver
+;
 use anyhow::Context;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -11,8 +11,7 @@ pub fn get_cpal_default_input_device() -> anyhow::Result<cpal::Device> {
 
 pub type CpalReceiverResult = Receiver<anyhow::Result<Vec<i16>>>;
 
-pub fn init_cpal_input_stream(input_dev : cpal::Device,
-    is_running : Arc<AtomicBool>) -> anyhow::Result<(cpal::Stream, u32, Option<CpalReceiverResult>)> {
+pub fn init_cpal_input_stream(input_dev : cpal::Device) -> anyhow::Result<(cpal::Stream, u32, Option<CpalReceiverResult>)> {
 
     eprintln!("Using input device: {}\n", input_dev.description().unwrap().name());
     
@@ -28,17 +27,15 @@ pub fn init_cpal_input_stream(input_dev : cpal::Device,
 
     let stream_res = input_dev.build_input_stream(&config.into(),
         move |data : &[i16], _: &_| {
-            if is_running.load(Ordering::Relaxed) {
-                let mut c : i32 = -1;
-                let mut data = data.to_vec();
-                
-                data.retain(|_| {
-                    c += 1;
-                    // Read audio from only one channel
-                    (c as u16).is_multiple_of(num_channels)
-                });
-                sender.send(Ok(data)).ok();
-            }
+            let mut c : i32 = -1;
+            let mut data = data.to_vec();
+
+            data.retain(|_| {
+                c += 1;
+                // Read audio from only one channel
+                (c as u16).is_multiple_of(num_channels)
+            });
+            sender.send(Ok(data)).ok();
         }, 
         move |e| { 
             // TODO: Turn e into an anyhow error

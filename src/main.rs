@@ -212,7 +212,7 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
         is_running_copy.store(false, Ordering::Relaxed);
     }).context("Could not set handler for ctrl-c: {}")?;
 
-    let (_cpal_stream, sample_rate, cpal_receiver) = input::init_cpal_input_stream(input_device, is_running.clone())
+    let (cpal_stream, sample_rate, cpal_receiver) = input::init_cpal_input_stream(input_device)
     .context("Error obtaining connection to recording thread: {}")?;
 
     // Receiver to catch audio data from stream
@@ -220,20 +220,22 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
         .context("Error obtaining connection to recording thread")?;
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
-        &model_path, cpal_receiver, sample_rate, is_running.clone(), print_asr_results
+        &model_path, cpal_receiver, sample_rate, print_asr_results
     ).context("Error obtaining connection to ASR thread: {}")?;
 
-    let match_res = pm::run_phrase_matcher(asr_receiver, executables.clone(), is_running.clone());
+    let match_res = pm::run_phrase_matcher(asr_receiver, executables.clone());
     let (match_receiver, match_thread) = match_res
         .context("Error obtaining connection to phrase matching thread")?;
     
-    let executor_res = execute::run_command_executor(match_receiver, executables.clone(), is_running.clone());
+    let executor_res = execute::run_command_executor(match_receiver, executables.clone());
     let (execute_receiver, execute_thread) = executor_res
         .context("Error obtaining connection to execution thread")?;
+
+    is_running.store(true, Ordering::Relaxed);
     
     // Main program loop
     while is_running.load(Ordering::Relaxed) {
-        while let Ok(data) = execute_receiver.try_recv() {
+        if let Ok(data) = execute_receiver.try_recv() {
             match data {
                 Ok(data) => {
                         println!("{}", data);
@@ -247,7 +249,14 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
                 }
             }
         }
+
+        // Wait a short while to prevent constant CPU consuption
+        std::thread::sleep(std::time::Duration::from_millis(5));
     }
+
+    // Close the initial cpal stream
+    eprintln!("Dropping cpal stream");
+    drop(cpal_stream);
 
     eprintln!("\nClosing execution thread...");
     execute_thread.join().expect("ASR thread panicked");
