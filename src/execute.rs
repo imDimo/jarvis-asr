@@ -47,7 +47,7 @@ pub struct Executable {
     pub phrase_position : PhrasePosition
 }
 
-pub type ExecuteReceiver = mpsc::Receiver<anyhow::Result<String, String>>;
+pub type ExecuteReceiver = mpsc::Receiver<anyhow::Result<String>>;
 
 pub fn run_command_executor(match_receiver : pm::PhraseMatchReceiver, executables : Vec<execute::Executable>, 
     is_running : Arc<AtomicBool>) -> anyhow::Result<(ExecuteReceiver, JoinHandle<()>)> {
@@ -62,7 +62,7 @@ pub fn run_command_executor(match_receiver : pm::PhraseMatchReceiver, executable
                         let command_data = match apply_arguments(&executables[i], &phrase_args) {
                             Ok(data) => data,
                             Err(e) => {
-                                eprintln!("Error: {e}");
+                                eprintln!("Error processing command: {e}");
                                 return;
                             }
                         };
@@ -108,7 +108,7 @@ pub fn run_command_executor(match_receiver : pm::PhraseMatchReceiver, executable
     Ok((receiver, executer_thread))
 }
 
-fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> anyhow::Result<Executable, String> {
+fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> anyhow::Result<Executable> {
     
     let mut wildcard_args = arguments.wildcard_args.clone();
     let list_args = arguments.list_args.clone();
@@ -118,10 +118,14 @@ fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> any
 
     let has_multi_arg = executable.args.iter().any(|arg| pm::arg_type(arg) == pm::ArgumentType::List);
 
-    if (!has_multi_arg && num_wildcards != arguments.wildcard_args.len())
-    || (has_multi_arg && num_wildcards > arguments.wildcard_args.len()) {
-        return Err(String::from("Argument length of phrase and executable did not match"));
-    }
+    anyhow::ensure!(
+        // If the command doesn't have variable-length arguments, its arguments
+        // list and the supplied arguments list should be the same length
+        (!has_multi_arg && arguments.wildcard_args.len() == num_wildcards) ||
+        // If the command has a variable-length argument, the supplied arguments
+        // list should be the same length or longer
+        (has_multi_arg && arguments.wildcard_args.len() >= num_wildcards),
+        "Argument length of phrase and executable did not match");
 
     // Add default and parameterized arguments
     let mut applied_args : Vec<String> = vec!();

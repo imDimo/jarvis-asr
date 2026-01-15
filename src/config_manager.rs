@@ -2,6 +2,7 @@ use std::{
     fs,
     path
 };
+use anyhow::Context;
 use crate::execute;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -9,29 +10,28 @@ struct PhrasesStruct {
     executables: Vec<execute::Executable>
 }
 
-pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
+pub fn init_config_directory() -> anyhow::Result<path::PathBuf> {
     let project_dirs = directories::ProjectDirs::from("com", "imdimo", "jarvis-asr");
 
-    let config_path = project_dirs
-        .ok_or(String::from("Could not obtain location of project config directory. Is your home set?"))?
+    let config_path = project_dirs.context("Could not obtain location of project config directory. Is your home set?")?
         .config_dir().to_owned();
 
     let config_path_exists = config_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of config directory path '{}': {}", config_path.to_string_lossy(), e))?;
+        .context(format!("Failed to verify existence of config directory path '{}'", config_path.to_string_lossy()))?;
 
     if !config_path_exists {
         fs::create_dir_all(&config_path)
-            .map_err(|e| format!("Failed to create config directory '{}': {}", config_path.to_string_lossy(), e))?
+            .context(format!("Failed to create config directory '{}'", config_path.to_string_lossy()))?
     }
 
     let phrases_file_path = &config_path.join(path::Path::new("phrases.json"));
 
     let phrases_file_exists = phrases_file_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of phrase config path '{}' {}", phrases_file_path.to_string_lossy(), e))?;
+        .context(format!("Failed to verify existence of phrase config path '{}'", phrases_file_path.to_string_lossy()))?;
 
     if !phrases_file_exists {
         let phrases_file = fs::File::create(phrases_file_path)
-            .map_err(|e| format!("Error initializing phrases file: {}", e))?;
+            .context("Error initializing phrases config file")?;
 
         // Write initial JSON data
         let phrases_file_structure = PhrasesStruct {
@@ -40,36 +40,34 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf, String> {
 
         let writer = std::io::BufWriter::new(phrases_file);
         serde_json::to_writer(writer, &phrases_file_structure)
-            .map_err(|e| format!("Error initializing phrases file: {}", e))?;
+            .context("Error initializing phrases file")?;
     }
 
     Ok(config_path.to_owned())
 }
 
-pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>, String> {
+pub fn load_executables(phrase_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>> {
 
     let phrases_file_path = &phrase_dir.join(path::Path::new("phrases.json"));
 
     let phrases_file_exists = phrases_file_path.try_exists()
-        .map_err(|e| format!("Failed to verify existence of phrase data path '{}': {}", phrases_file_path.to_string_lossy(), e))?;
-
-    if !phrases_file_exists {
-        return Err(format!("Phrases config directory '{}' does not exist", phrases_file_path.to_string_lossy()));
-    }
+        .context(format!("Failed to verify existence of phrase data path '{}'", phrases_file_path.to_string_lossy()))?;
+    
+    anyhow::ensure!(phrases_file_exists, format!("Phrases config directory '{}' does not exist", phrases_file_path.to_string_lossy()));
 
     let phrase_file_contents = fs::read_to_string(phrases_file_path)
-        .map_err(|e| format!("Failed to read file contents: {}", e))?;
+        .context("Failed to read contents of phrases config file")?;
 
     let phrase_data : serde_json::Value = serde_json::from_str(&phrase_file_contents)
-        .map_err(|e| format!("Failed to parse JSON data from file: {}", e))?;
+        .context("Failed to parse JSON data from phrases.json file")?;
 
     let root_obj = phrase_data.as_object()
-        .ok_or(String::from("JSON root must be an object"))?;
+        .context(String::from("JSON root must be an object"))?;
 
     let executables_arr = root_obj.get("executables")
-        .ok_or(String::from("Expected 'executables' in root JSON object"))?
+        .context(String::from("Expected 'executables' in root JSON object"))?
         .as_array()
-        .ok_or(String::from("Expected 'executables' to be array type"))?;
+        .context(String::from("Expected 'executables' to be array type"))?;
     
     let mut executables = get_executables(executables_arr);
 
@@ -150,7 +148,7 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
         .collect::<Vec<execute::Executable>>()
 }
 
-pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(), String> {
+pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
     println!("----- Add a command -----");
 
     let mut phrase = String::new();
@@ -170,8 +168,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
     println!("Leave input empty to cancel");
 
     println!("Phrase:");
-    std::io::stdin().read_line(&mut phrase)
-        .map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut phrase)?;
     
     pop_newlines(&mut phrase);
 
@@ -180,8 +177,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
     }
 
     println!("Command:");
-    std::io::stdin().read_line(&mut command)
-        .map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut command)?;
 
     pop_newlines(&mut command);
 
@@ -190,8 +186,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
     }
 
     println!("Arguments (Enter one at a time, leave empty to finish):");
-    std::io::stdin().read_line(&mut arg)
-        .map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut arg)?;
     arg = arg.trim().to_owned();
     
     pop_newlines(&mut arg);
@@ -200,8 +195,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
         args.push(arg.clone());
         arg.clear();
         
-        std::io::stdin().read_line(&mut arg)
-            .map_err(|e| e.to_string())?;
+        std::io::stdin().read_line(&mut arg)?;
         arg = arg.trim().to_owned();
 
         pop_newlines(&mut arg);
@@ -214,8 +208,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
     println!("Your choice (1 - 3):");
 
     let mut phrase_pos_input = String::new();
-    std::io::stdin().read_line(&mut phrase_pos_input)
-        .map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut phrase_pos_input)?;
     pop_newlines(&mut phrase_pos_input);
 
     if phrase_pos_input.is_empty() {
@@ -224,16 +217,13 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
 
     let i : i32 = phrase_pos_input.parse().unwrap_or(-1);
 
-    let phrase_position = if (1..=3).contains(&i) {
-        [
-            execute::PhrasePosition::Any, 
-            execute::PhrasePosition::Start,
-            execute::PhrasePosition::Exact
-        ][(i - 1) as usize].to_owned()
-    }
-    else {
-        return Err(String::from("Invalid option"));
-    };
+    anyhow::ensure!((1..=3).contains(&i), "Invalid option");
+
+    let phrase_position = [
+        execute::PhrasePosition::Any, 
+        execute::PhrasePosition::Start,
+        execute::PhrasePosition::Exact
+    ][(i - 1) as usize].to_owned();
 
     let executable = execute::Executable {
         phrase,
@@ -247,11 +237,9 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> Result<(),
     Ok(())
 }
 
-pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> Result<(), String> {
+pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
     
-    if executables.is_empty() {
-        return Err(String::from("No executables to be removed"));
-    }
+    anyhow::ensure!(!executables.is_empty(), "No executables to be removed");
 
     println!("----- Remove a command -----");
 
@@ -260,39 +248,32 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> Result<
     let mut index_str = String::new();
 
     println!("Index to remove: ");
-    std::io::stdin().read_line(&mut index_str)
-        .map_err(|e| e.to_string())?;
+    std::io::stdin().read_line(&mut index_str)?;
 
     let index : i32 = index_str.trim().parse().unwrap_or(-1);
 
-    if (1..=executables.len() as i32).contains(&index) {
-        println!("Removing executable at index [{}]", index);
-        executables.remove((index - 1) as usize);
-    }
-    else {
-        return Err(String::from("Invalid index"));
-    }
+    anyhow::ensure!((1..=executables.len() as i32).contains(&index), "Invalid index");
+
+    println!("Removing executable at index [{}]", index);
+    executables.remove((index - 1) as usize);
 
     Ok(())
 }
 
-pub fn write_executables(executables : Vec<execute::Executable>, phrases_dir : &path::Path) -> Result<(), String> {
+pub fn write_executables(executables : Vec<execute::Executable>, phrases_dir : &path::Path) -> anyhow::Result<()> {
     let phrases_file_path = &phrases_dir.join(path::Path::new("phrases.json"));
 
-    let phrases_file_exists = if let Ok(exists) = phrases_file_path.try_exists() {
-        exists
-    }
-    else {
-        return Err(format!("Failed to verify existence of phrase data path {}", phrases_file_path.to_string_lossy()));
-    };
+    let phrases_file_exists = phrases_file_path.try_exists()
+        .context(format!("Failed to verify existence of phrase data path {}",
+            phrases_file_path.to_string_lossy()))?;
 
-    if !phrases_file_exists {
-        return Err(format!("Phrases config directory '{}' does not exist", phrases_file_path.to_string_lossy()));
-    }
+    anyhow::ensure!(phrases_file_exists, 
+        format!("Phrases config directory '{}' does not exist",
+        phrases_file_path.to_string_lossy()));
     
     // Recreate phrases file with updated data
     let phrases_file = fs::File::create(phrases_file_path)
-        .map_err(|e| format!("Error creating file {}: {}", phrases_file_path.to_string_lossy(), e))?;
+        .context(format!("Error creating file {}", phrases_file_path.to_string_lossy()))?;
 
     // Create structure of JSON data
     let phrases_file_structure = PhrasesStruct {
@@ -301,7 +282,7 @@ pub fn write_executables(executables : Vec<execute::Executable>, phrases_dir : &
 
     let writer = std::io::BufWriter::new(phrases_file);
     serde_json::to_writer_pretty(writer, &phrases_file_structure)
-        .map_err(|e| format!("Error writing phrases to file: {}", e))?;
+        .context("Error saving commands to config file")?;
 
     Ok(())
 }

@@ -3,6 +3,7 @@ use std::{
     sync::{Arc, atomic::{AtomicBool, Ordering}, mpsc},
     thread::{self, JoinHandle}
 };
+use anyhow::Context;
 use vosk::{DecodingState, Model, Recognizer};
 
 use crate::input;
@@ -10,10 +11,10 @@ use crate::input;
 pub const RECOGNIZER_MAX_ALTERNATIVES : u16 = 0;
 pub const DATA_CHUNKS : usize = 100;
 
-pub type AsrReceiverResult = mpsc::Receiver<anyhow::Result<String, String>>;
+pub type AsrReceiverResult = mpsc::Receiver<anyhow::Result<String>>;
 
 pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResult, sample_rate : u32,
-    is_running : Arc<AtomicBool>, print_results : bool) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>), String> {
+    is_running : Arc<AtomicBool>, print_results : bool) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>)> {
 
     // Sender and receiver to communicate text data
     let (sender, receiver) = mpsc::channel();
@@ -21,10 +22,10 @@ pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResu
     let model_path_str = model_path.to_string_lossy();
 
     let model = Model::new(model_path_str.clone())
-        .ok_or(format!("Failed to create VOSK model from path {}", &model_path_str))?;
+        .context(format!("Failed to create VOSK model from path {}", &model_path_str))?;
 
     let mut recognizer = Recognizer::new(&model, sample_rate as f32)
-        .ok_or(String::from("Error occurred while creating VOSK recognizer"))?;
+        .context("Error occurred while creating VOSK recognizer")?;
 
     recognizer.set_max_alternatives(RECOGNIZER_MAX_ALTERNATIVES);
     // recognizer.set_words(true);
