@@ -1,6 +1,4 @@
-use std::
-    sync::mpsc::Receiver
-;
+use std::sync::mpsc::Receiver;
 use anyhow::Context;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 

@@ -233,7 +233,7 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
 
     is_running.store(true, Ordering::Relaxed);
     
-    // Main program loop
+    // Main program loop - Controls when the program exits
     while is_running.load(Ordering::Relaxed) {
         if let Ok(data) = execute_receiver.try_recv() {
             match data {
@@ -258,13 +258,13 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
     eprintln!("Dropping cpal stream");
     drop(cpal_stream);
 
-    eprintln!("\nClosing execution thread...");
+    eprintln!("\nJoining execution thread...");
     execute_thread.join().expect("ASR thread panicked");
 
-    eprintln!("Closing processing thread...");
+    eprintln!("Joining processing thread...");
     match_thread.join().expect("ASR thread panicked");
 
-    eprintln!("Closing ASR thread...");
+    eprintln!("Joining ASR thread...");
     asr_thread.join().expect("ASR thread panicked");
 
     Ok(())
