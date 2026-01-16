@@ -156,21 +156,12 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     let mut arg = String::new();
     let mut args : Vec<String> = Vec::new();
 
-    let pop_newlines = |str : &mut String| {
-        if str.ends_with('\n') {
-            str.pop();
-            if str.ends_with('\r') {
-                str.pop();
-            }
-        }
-    };
-    
     println!("Leave input empty to cancel");
 
     println!("Phrase:");
     std::io::stdin().read_line(&mut phrase)?;
     
-    pop_newlines(&mut phrase);
+    phrase = phrase.trim().to_owned();
 
     if phrase.is_empty() {
         return Ok(());
@@ -179,7 +170,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     println!("Command:");
     std::io::stdin().read_line(&mut command)?;
 
-    pop_newlines(&mut command);
+    command = command.trim().to_owned();
 
     if command.is_empty() {
         return Ok(());
@@ -187,18 +178,16 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
 
     println!("Arguments (Enter one at a time, leave empty to finish):");
     std::io::stdin().read_line(&mut arg)?;
+
     arg = arg.trim().to_owned();
-    
-    pop_newlines(&mut arg);
 
     while !arg.is_empty() {
         args.push(arg.clone());
         arg.clear();
         
         std::io::stdin().read_line(&mut arg)?;
-        arg = arg.trim().to_owned();
 
-        pop_newlines(&mut arg);
+        arg = arg.trim().to_owned();
     }
 
     println!("When should this command be executed?");
@@ -209,7 +198,8 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
 
     let mut phrase_pos_input = String::new();
     std::io::stdin().read_line(&mut phrase_pos_input)?;
-    pop_newlines(&mut phrase_pos_input);
+
+    phrase_pos_input = phrase_pos_input.trim().to_owned();
 
     if phrase_pos_input.is_empty() {
         return Ok(());
