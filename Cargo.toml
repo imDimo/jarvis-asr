@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
-console-utils = "1.8.2"
 cpal = "0.17.0"
+crossterm = "0.29.0"
 ctrlc = "3.5.1"
 directories = "6.0.0"
 getargs = "0.5.0"

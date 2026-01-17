@@ -1,48 +1,77 @@
-use std::sync::mpsc;
-
+use std::{io::Write, sync::mpsc};
 use anyhow::Context;
 
-pub fn search_fs() -> anyhow::Result<String> {
+pub fn search_fs() -> anyhow::Result<Option<String>> {
 
     let (sender, receiver) = mpsc::channel();
 
     let t = std::thread::spawn(move || {
         let mut working_path = std::path::PathBuf::new();
 
-        loop {
-            let key_res = console_utils::read::read_key();
-            if let Ok(key) = key_res {
-                match key {
-                    console_utils::read::Key::Tab => {
+        if let Err(e) = crossterm::terminal::enable_raw_mode() {
+            sender.send(anyhow::Result::Err(e).context("Error entering raw terminal")).ok();
+        }
 
+        loop {
+            if let Ok(event) = crossterm::event::read()
+            && let Some(key_event) = event.as_key_event()
+            && key_event.is_press() {
+                match key_event.code {
+                    crossterm::event::KeyCode::Tab => {
                         working_path = fs_autocomplete(working_path);
 
-                        console_utils::control::clear_line();
-                        print!("{}", working_path.to_str().unwrap());
-                        console_utils::control::flush();
+                        let _clear_res = crossterm::queue!(std::io::stdout(),
+                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                            crossterm::cursor::MoveToColumn(0)
+                        );
+
+                        let _out_res = std::io::stdout().write_all(working_path.to_str().unwrap().as_bytes());
+                        let _flush_res = std::io::stdout().flush();
                     },
-                    console_utils::read::Key::Backspace => {
+                    crossterm::event::KeyCode::Backspace => {
                         let mut working_str = working_path.to_str().unwrap().to_owned();
                         working_str.pop();
 
-                        console_utils::control::clear_line();
-                        print!("{}", working_str);
-                        console_utils::control::flush();
+                        let _clear_res = crossterm::queue!(std::io::stdout(),
+                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                            crossterm::cursor::MoveToColumn(0)
+                        );
+
+                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                        let _flush_res = std::io::stdout().flush();
 
                         working_path = std::path::PathBuf::from(working_str);
                     },
-                    console_utils::read::Key::Char(c) => {
+                    crossterm::event::KeyCode::Char(c) => {
+                        if c == 'c' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                            if let Err(e) = crossterm::terminal::disable_raw_mode() {
+                                sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
+                            }
+
+                            sender.send(Ok(None)).ok();
+                            println!();
+                            break;
+                        }
+
                         let mut working_str = working_path.to_str().unwrap().to_owned();
                         working_str.push(c);
 
-                        console_utils::control::clear_line();
-                        print!("{}", working_str);
-                        console_utils::control::flush();
+                        let _clear_res = crossterm::queue!(std::io::stdout(),
+                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                            crossterm::cursor::MoveToColumn(0)
+                        );
+
+                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                        let _flush_res = std::io::stdout().flush();
 
                         working_path = std::path::PathBuf::from(working_str);
                     },
-                    console_utils::read::Key::Enter => {
-                        sender.send(working_path.to_string_lossy().to_string()).ok();
+                    crossterm::event::KeyCode::Enter => {
+                        if let Err(e) = crossterm::terminal::disable_raw_mode() {
+                            sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
+                        }
+
+                        sender.send(Ok(Some(working_path.to_string_lossy().to_string()))).ok();
                         println!();
                         break;
                     },
@@ -58,7 +87,7 @@ pub fn search_fs() -> anyhow::Result<String> {
     drop(receiver);
     t.join().expect("Error closing thread");
 
-    Ok(data)
+    data
 }
 
 fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf {
@@ -86,10 +115,10 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
             }
 
             let target_loc = &file_query[0].to_owned();
-            working_path.push(target_loc);   
+            working_path.push(target_loc);
         }
         else {
-            println!();
+            let _out_res = std::io::stdout().write_all("\n".as_bytes());
 
             print_hints(&file_query);
 
@@ -102,10 +131,12 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
         }
     }
 
+    // Add trailing slash to autocompleted directories
     if working_path.is_dir() {
         let mut dir_osstr = working_path.as_os_str().to_owned();
-        if !dir_osstr.to_string_lossy().ends_with("/") {
-            dir_osstr.push("/");
+
+        if !dir_osstr.to_string_lossy().ends_with(std::path::MAIN_SEPARATOR) {
+            dir_osstr.push(std::path::MAIN_SEPARATOR_STR);
             working_path = dir_osstr.into();
         }
     }
@@ -121,13 +152,13 @@ fn get_current_dir(working_path : &std::path::PathBuf) -> std::path::PathBuf {
         dir.to_owned()
     }
     else {
-        std::path::PathBuf::from("/")
+        std::path::PathBuf::new()
     }
 }
 
 fn get_hints(working_path : &std::path::PathBuf, current_dir : &std::path::PathBuf, dir_entries : &[std::fs::DirEntry]) -> Vec<std::path::PathBuf> {
     if working_path != current_dir && let Some(filename) = working_path.file_name() {
-        dir_entries.iter().filter_map(|path| { 
+        dir_entries.iter().filter_map(|path| {
             if path.file_name().to_string_lossy().starts_with(filename.to_str().unwrap())  {
                 Some(path.path())
             }
@@ -141,16 +172,31 @@ fn get_hints(working_path : &std::path::PathBuf, current_dir : &std::path::PathB
     }
 }
 
-fn print_hints(file_query : &Vec<std::path::PathBuf>) { 
-    let hint_text_color = console_utils::styled::Color::Cyan;
-    for path in file_query {
-        let text = path.file_name().unwrap().to_str().unwrap();
-        let styled_text = console_utils::styled::StyledText::new(text)
-            .fg(hint_text_color);
+fn print_hints(file_query : &Vec<std::path::PathBuf>) {
+    let style_res = crossterm::queue!(
+        std::io::stdout(),
+        crossterm::style::SetForegroundColor(crossterm::style::Color::Cyan)
+    );
 
-        let output = styled_text.format_sequence();
-        println!("{}", &output);
-    };
+    if style_res.is_ok() {
+        for path in file_query {
+            let _move_res = crossterm::queue!(
+            std::io::stdout(),
+            crossterm::cursor::MoveToColumn(0)
+            );
+            let text = path.file_name().unwrap().to_str().unwrap();
+            let _out_res = std::io::stdout().write_all(text.as_bytes());
+            let _out_res = std::io::stdout().write("\n".as_bytes());
+        };
+    }
+    else {
+        return;
+    }
+
+    let _style_res = crossterm::queue!(
+        std::io::stdout(),
+        crossterm::style::ResetColor
+    );
 }
 
 fn modify_search(working_path : &mut std::path::PathBuf, curr_search : &str, file_strings : &[String]) {
