@@ -1,3 +1,4 @@
+mod autocomplete;
 mod config_manager;
 mod input;
 mod asr_handler;

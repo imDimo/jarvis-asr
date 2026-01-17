@@ -3,6 +3,7 @@ use std::{
     path
 };
 use anyhow::Context;
+use crate::autocomplete;
 use crate::execute;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -52,7 +53,7 @@ pub fn load_executables(commands_dir : &path::Path) -> anyhow::Result<Vec<execut
 
     let commands_file_exists = commands_file_path.try_exists()
         .context(format!("Failed to verify existence of command data path '{}'", commands_file_path.to_string_lossy()))?;
-    
+
     anyhow::ensure!(commands_file_exists, format!("Commands config directory '{}' does not exist", commands_file_path.to_string_lossy()));
 
     let command_file_contents = fs::read_to_string(commands_file_path)
@@ -68,7 +69,7 @@ pub fn load_executables(commands_dir : &path::Path) -> anyhow::Result<Vec<execut
         .context(String::from("Expected 'executables' in root JSON object"))?
         .as_array()
         .context(String::from("Expected 'executables' to be array type"))?;
-    
+
     let mut executables = get_executables(executables_arr);
 
     // Sort executables so longest phrases are matched first
@@ -138,8 +139,8 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
         .filter(|ex| { // Remove executables that produced errors
             match ex {
                 Ok(_) => true,
-                Err(e) => { 
-                    eprintln!("{}", e); 
+                Err(e) => {
+                    eprintln!("{}", e);
                     false
                 }
             }
@@ -151,16 +152,12 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
 pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
     println!("----- Add a command -----");
 
-    let mut phrase = String::new();
-    let mut command = String::new();
-    let mut arg = String::new();
-    let mut args : Vec<String> = Vec::new();
-
     println!("Leave input empty to cancel");
 
     println!("Phrase:");
+    let mut phrase = String::new();
     std::io::stdin().read_line(&mut phrase)?;
-    
+
     phrase = phrase.trim().to_owned();
 
     if phrase.is_empty() {
@@ -168,26 +165,43 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     }
 
     println!("Command:");
-    std::io::stdin().read_line(&mut command)?;
+    let command_opt = autocomplete::search_fs()?;
 
-    command = command.trim().to_owned();
+    let command = if let Some(command) = command_opt {
+        command.trim().to_owned()
+    }
+    else {
+        return Ok(());
+    };
 
     if command.is_empty() {
         return Ok(());
     }
 
-    println!("Arguments (Enter one at a time, leave empty to finish):");
-    std::io::stdin().read_line(&mut arg)?;
+    let mut args : Vec<String> = Vec::new();
 
-    arg = arg.trim().to_owned();
+    println!("Arguments (Enter one at a time, leave empty to finish):");
+    let mut arg_opt = autocomplete::search_fs()?;
+
+    let mut arg = if let Some(arg) = arg_opt {
+        arg.trim().to_owned()
+    } 
+    else {
+        return Ok(());
+    };
 
     while !arg.is_empty() {
         args.push(arg.clone());
         arg.clear();
-        
-        std::io::stdin().read_line(&mut arg)?;
 
-        arg = arg.trim().to_owned();
+        arg_opt = autocomplete::search_fs()?;
+
+        arg = if let Some(arg) = arg_opt {
+            arg.trim().to_owned()
+        } 
+        else {
+            return Ok(());
+        };
     }
 
     println!("When should this command be executed?");
@@ -210,7 +224,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     anyhow::ensure!((1..=3).contains(&i), "Invalid option");
 
     let phrase_position = [
-        execute::PhrasePosition::Any, 
+        execute::PhrasePosition::Any,
         execute::PhrasePosition::Start,
         execute::PhrasePosition::Exact
     ][(i - 1) as usize].to_owned();
@@ -228,12 +242,12 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
 }
 
 pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
-    
+
     anyhow::ensure!(!executables.is_empty(), "No executables to be removed");
 
     println!("----- Remove a command -----");
 
-    execute::print_executables(executables);   
+    execute::print_executables(executables);
 
     let mut index_str = String::new();
 
@@ -257,10 +271,10 @@ pub fn write_executables(executables : Vec<execute::Executable>, commands_dir : 
         .context(format!("Failed to verify existence of commands data path {}",
             commands_file_path.to_string_lossy()))?;
 
-    anyhow::ensure!(commands_file_exists, 
+    anyhow::ensure!(commands_file_exists,
         format!("Commands config directory '{}' does not exist",
         commands_file_path.to_string_lossy()));
-    
+
     // Recreate commands file with updated data
     let commands_file = fs::File::create(commands_file_path)
         .context(format!("Error creating file {}", commands_file_path.to_string_lossy()))?;
