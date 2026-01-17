@@ -3,6 +3,7 @@ use std::{
     path
 };
 use anyhow::Context;
+use crate::autocomplete;
 use crate::execute;
 
 #[derive(serde::Deserialize, serde::Serialize)]
@@ -151,14 +152,10 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
 pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
     println!("----- Add a command -----");
 
-    let mut phrase = String::new();
-    let mut command = String::new();
-    let mut arg = String::new();
-    let mut args : Vec<String> = Vec::new();
-
     println!("Leave input empty to cancel");
 
     println!("Phrase:");
+    let mut phrase = String::new();
     std::io::stdin().read_line(&mut phrase)?;
     
     phrase = phrase.trim().to_owned();
@@ -168,7 +165,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     }
 
     println!("Command:");
-    std::io::stdin().read_line(&mut command)?;
+    let mut command = autocomplete::search_fs()?;
 
     command = command.trim().to_owned();
 
@@ -176,8 +173,10 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
         return Ok(());
     }
 
+    let mut args : Vec<String> = Vec::new();
+
     println!("Arguments (Enter one at a time, leave empty to finish):");
-    std::io::stdin().read_line(&mut arg)?;
+    let mut arg = autocomplete::search_fs()?;
 
     arg = arg.trim().to_owned();
 
