@@ -46,9 +46,15 @@ fn main() -> anyhow::Result<()> {
     eprintln!("Read config");
 
     if program_args.clean_command {
+        eprintln!("Cleaning executables...");
         let cleaned_executables = dirty_executables.iter().filter_map(|ex| { 
-            if execute::validate_executable(ex) { Some(ex.clone()) }
-            else { None }
+            match execute::validate_executable(ex) { 
+                Ok(_) => Some(ex.clone()),
+                Err(e) => {
+                    eprintln!("Removing executable with phrase \"{}\": {}", ex.phrase, e);
+                    None 
+                }
+            }
         }).collect::<Vec<execute::Executable>>();
 
         config::write_executables(cleaned_executables, &phrases_path)?;
@@ -67,8 +73,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     let executables = dirty_executables.iter().filter_map(|ex| { 
-        if execute::validate_executable(ex) { Some(ex.clone()) }
-        else { None }
+        match execute::validate_executable(ex) { 
+            Ok(_) => Some(ex.clone()),
+            Err(e) => {
+                eprintln!("Error loading executable with phrase \"{}\": {}", ex.phrase, e);
+                None 
+            }
+        }
     }).collect::<Vec<execute::Executable>>();
 
     eprintln!("Loaded valid executables");
@@ -199,22 +210,26 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
 }
 
 fn check_arg_compatibility(program_args : &ProgramArgs) -> anyhow::Result<()> {
-    
-    if program_args.add_command && (program_args.remove_command || program_args.query_devices 
-    || program_args.print_asr_results || program_args.model_path.is_some()
-    || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // Check if the program has any normal runtime arguments
+    let has_normal_args = program_args.print_asr_results 
+        || program_args.model_path.is_some()
+        || program_args.input_device_index_str.is_some();
 
-    if program_args.remove_command && (program_args.query_devices || program_args.print_asr_results
-    || program_args.model_path.is_some() || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // List of booleans describing which arguments are present
+    // Only one should be true
+    let arg_compat = vec!(
+        program_args.add_command, 
+        program_args.remove_command,
+        program_args.query_devices,
+        program_args.clean_command,
+        has_normal_args
+    );
 
-    if program_args.query_devices && (program_args.print_asr_results || program_args.model_path.is_some()
-    || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // If more than one special argument is specified, or any special arguments
+    // are specified along with the normal arguments, the arguments are invalid
+    let args_are_valid = arg_compat.iter().filter(|arg| **arg).count() <= 1;
+
+    anyhow::ensure!(args_are_valid, "Incompatible combination of arguments");
 
     Ok(())
 }

@@ -162,15 +162,14 @@ fn apply_arguments(executable : &Executable, arguments : &pm::PhraseArgs) -> any
     })
 }
 
-pub fn validate_executable(executable : &Executable) -> bool {
+pub fn validate_executable(executable : &Executable) -> anyhow::Result<()> {
 
     // Verify that there is at most one variable-length arg, at the end of the phrase
     let mut num_list_args = executable.phrase.split(' ')
         .filter(|str| pm::arg_type(str) == pm::ArgumentType::List).count();
 
     if num_list_args > 1 || (num_list_args == 1 && !executable.phrase.ends_with("...>")) {
-        eprintln!("Executable with phrase {} may only contain a singular variable-length argument, and it must be at the end of the phrase", executable.phrase);
-        return false;
+        anyhow::bail!("Executable may only contain a singular variable-length argument, and it must be at the end of the phrase");
     }
     
     // Verify that there is at most one variable-length arg in the arguments list
@@ -179,16 +178,14 @@ pub fn validate_executable(executable : &Executable) -> bool {
         .count();
 
     if num_list_args > 1 {
-        eprintln!("Executable with phrase {} may only contain a singular variable-length argument in the arguments list", executable.phrase);
-        return false;
+        anyhow::bail!("Executable may only contain a singular variable-length argument in the arguments list");
     }
     
     // Verify that each argument in the arguments list matches to at least one in the phrase
     for arg in executable.args.iter()
         .filter(|arg| pm::arg_type(arg) != pm::ArgumentType::Default) {
         if !executable.phrase.contains(arg) {
-            eprintln!("Executable with phrase \"{}\" is expected to reference argument \"{}\"", executable.phrase, arg);
-            return false;
+            anyhow::bail!("Expected phrase to reference argument \"{}\"", arg);
         }
     }
 
@@ -196,11 +193,11 @@ pub fn validate_executable(executable : &Executable) -> bool {
     for arg in executable.phrase.split(' ')
         .filter(|str| pm::arg_type(str) != pm::ArgumentType::Default) {
         if !executable.args.contains(&arg.to_owned()) {
-            eprintln!("Executable with phrase \"{}\" references unknown argument \"{}\"", executable.phrase, arg);
+            anyhow::bail!("Phrase references unknown argument \"{}\"", arg);
         }
     }
 
-    true
+    Ok(())
 }
 
 pub fn print_executables(executables : &[crate::execute::Executable]) {
