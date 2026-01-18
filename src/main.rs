@@ -62,8 +62,13 @@ fn main() -> anyhow::Result<()> {
     }
 
     if program_args.add_command {
-        config::add_executable(&mut dirty_executables)?;
-        config::write_executables(dirty_executables, &phrases_path)?;
+        if let Err(e) = config::add_executable(&mut dirty_executables) {
+            eprintln!("Error adding executable: {}", e);
+        }
+        else {
+            config::write_executables(dirty_executables, &phrases_path)?;
+        }
+        
         return Ok(());
     }
     else if program_args.remove_command {

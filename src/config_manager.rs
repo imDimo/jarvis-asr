@@ -236,6 +236,8 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
         phrase_position
     };
 
+    execute::validate_executable(&executable)?;
+
     executables.push(executable);
 
     Ok(())
