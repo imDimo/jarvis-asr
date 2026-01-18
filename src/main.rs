@@ -45,6 +45,16 @@ fn main() -> anyhow::Result<()> {
 
     eprintln!("Read config");
 
+    if program_args.clean_command {
+        let cleaned_executables = dirty_executables.iter().filter_map(|ex| { 
+            if execute::validate_executable(ex) { Some(ex.clone()) }
+            else { None }
+        }).collect::<Vec<execute::Executable>>();
+
+        config::write_executables(cleaned_executables, &phrases_path)?;
+        return Ok(());
+    }
+
     if program_args.add_command {
         config::add_executable(&mut dirty_executables)?;
         config::write_executables(dirty_executables, &phrases_path)?;
