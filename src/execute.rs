@@ -9,7 +9,7 @@ use crate::{execute, phrase_matcher as pm};
 
 #[derive(serde::Deserialize, cmp::Eq, cmp::Ord, cmp::PartialEq, cmp::PartialOrd, Clone)]
 pub enum PhrasePosition {
-    Any, Start, Exact
+    Any, Start, Exact, Err
 }
 
 impl serde::Serialize for PhrasePosition {
@@ -20,7 +20,8 @@ impl serde::Serialize for PhrasePosition {
         let str = match self {
             PhrasePosition::Any => "any",
             PhrasePosition::Start => "at_start",
-            PhrasePosition::Exact => "match_exact"
+            PhrasePosition::Exact => "match_exact",
+            PhrasePosition::Err => "unknown"
         };
 
         serializer.serialize_str(str)
@@ -32,7 +33,8 @@ impl std::fmt::Display for PhrasePosition {
         let pos = match self {
             PhrasePosition::Any => "anywhere",
             PhrasePosition::Start => "at start",
-            PhrasePosition::Exact => "only exact matches"
+            PhrasePosition::Exact => "only exact matches",
+            PhrasePosition::Err => "unknown"
         };
 
         write!(f, "{pos}")
@@ -195,6 +197,10 @@ pub fn validate_executable(executable : &Executable) -> anyhow::Result<()> {
         if !executable.args.contains(&arg.to_owned()) {
             anyhow::bail!("Phrase references unknown argument \"{}\"", arg);
         }
+    }
+
+    if executable.phrase_position == execute::PhrasePosition::Err {
+        anyhow::bail!("Invalid match type");
     }
 
     Ok(())

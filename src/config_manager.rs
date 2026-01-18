@@ -126,7 +126,7 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
             "any" => execute::PhrasePosition::Any,
             "at_start" => execute::PhrasePosition::Start,
             "match_exact" => execute::PhrasePosition::Exact,
-            _ => Err(String::from("Invalid phrase_position type encountered. Should have been 'any', 'at_start', or 'match_exact'"))?
+            _ => execute::PhrasePosition::Err
         };
 
         Ok(execute::Executable {
