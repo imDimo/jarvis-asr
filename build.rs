@@ -16,11 +16,11 @@ fn main() {
 fn get_vosk_linux(cargo_dir : &Path) {
 
     let vosk = Path::new("libvosk.so");
-    
+
     let local_libs = cargo_dir.join(Path::new("./lib/linux"));
 
     let mut local_vosk = false;
-    
+
     // Use project-relative VOSK library if possible
     let vosk_path = if local_libs.join(vosk).try_exists().is_ok_and(|exists| exists) {
         local_vosk = true;
@@ -58,7 +58,7 @@ fn get_vosk_windows(cargo_dir : &Path) {
     let local_libs = cargo_dir.join(Path::new("./lib/windows"));
 
     let mut local_vosk = false;
-    
+
     // Use project-relative VOSK library if possible
     let vosk_path = if local_libs.join(vosk).try_exists().is_ok_and(|exists| exists) {
         local_vosk = true;
@@ -68,7 +68,7 @@ fn get_vosk_windows(cargo_dir : &Path) {
         // Search for system VOSK library
         let system_lib_paths = std::env::var("PATH")
             .expect("System PATH not set or could not be found. Fix this or include Vosk libraries under /lib/windows/")
-            .split(':').map(|s| Path::new(s).to_owned()).collect::<Vec<PathBuf>>();
+            .split(';').map(|s| Path::new(s).to_owned()).collect::<Vec<PathBuf>>();
         system_lib_paths.iter().find(|p| p.join(vosk).try_exists().is_ok_and(|exists| exists))
             .expect("libvosk.so could not be found under /lib/windows/ or in the system PATH")
             .to_owned()
