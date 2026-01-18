@@ -126,7 +126,7 @@ fn get_executables(executables_arr : &[serde_json::Value]) -> Vec<execute::Execu
             "any" => execute::PhrasePosition::Any,
             "at_start" => execute::PhrasePosition::Start,
             "match_exact" => execute::PhrasePosition::Exact,
-            _ => Err(String::from("Invalid phrase_position type encountered. Should have been 'any', 'at_start', or 'match_exact'"))?
+            _ => execute::PhrasePosition::Err
         };
 
         Ok(execute::Executable {
@@ -236,6 +236,8 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
         phrase_position
     };
 
+    execute::validate_executable(&executable)?;
+
     executables.push(executable);
 
     Ok(())
@@ -247,6 +249,7 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
 
     println!("----- Remove a command -----");
 
+    println!("[0] Cancel");
     execute::print_executables(executables);
 
     let mut index_str = String::new();
@@ -254,7 +257,12 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
     println!("Index to remove: ");
     std::io::stdin().read_line(&mut index_str)?;
 
-    let index : i32 = index_str.trim().parse().unwrap_or(-1);
+    let index : i32 = index_str.trim().parse().unwrap_or(0);
+
+    if index == 0 {
+        println!("Canceled");
+        return Ok(())
+    }
 
     anyhow::ensure!((1..=executables.len() as i32).contains(&index), "Invalid index");
 

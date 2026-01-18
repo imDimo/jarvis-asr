@@ -16,8 +16,9 @@ use phrase_matcher as pm;
 
 struct ProgramArgs {
     add_command : bool,
-    input_device_index_str : Option<String>,
+    clean_command : bool,
     help : bool,
+    input_device_index_str : Option<String>,
     model_path : Option<String>,
     print_asr_results : bool,
     query_devices : bool,
@@ -40,25 +41,53 @@ fn main() -> anyhow::Result<()> {
     }
 
     let phrases_path = config::init_config_directory()?;
-    let dirty_executables = config::load_executables(&phrases_path)?;
+    let mut dirty_executables = config::load_executables(&phrases_path)?;
 
-    let mut executables = dirty_executables.iter().filter_map(|ex| { 
-        if execute::validate_executable(ex) { Some(ex.clone()) }
-        else { None }
-    }).collect::<Vec<execute::Executable>>();
+    eprintln!("Read config");
 
-    eprintln!("Loaded valid executables");
+    if program_args.clean_command {
+        eprintln!("Cleaning executables...");
+        let cleaned_executables = dirty_executables.iter().filter_map(|ex| { 
+            match execute::validate_executable(ex) { 
+                Ok(_) => Some(ex.clone()),
+                Err(e) => {
+                    eprintln!("Removing executable with phrase \"{}\": {}", ex.phrase, e);
+                    None 
+                }
+            }
+        }).collect::<Vec<execute::Executable>>();
+
+        config::write_executables(cleaned_executables, &phrases_path)?;
+        return Ok(());
+    }
 
     if program_args.add_command {
-        config::add_executable(&mut executables)?;
-        config::write_executables(executables, &phrases_path)?;
+        if let Err(e) = config::add_executable(&mut dirty_executables) {
+            eprintln!("Error adding executable: {}", e);
+        }
+        else {
+            config::write_executables(dirty_executables, &phrases_path)?;
+        }
+        
         return Ok(());
     }
     else if program_args.remove_command {
-        config::remove_executable(&mut executables)?;
-        config::write_executables(executables, &phrases_path)?;
+        config::remove_executable(&mut dirty_executables)?;
+        config::write_executables(dirty_executables, &phrases_path)?;
         return Ok(());
     }
+
+    let executables = dirty_executables.iter().filter_map(|ex| { 
+        match execute::validate_executable(ex) { 
+            Ok(_) => Some(ex.clone()),
+            Err(e) => {
+                eprintln!("Error loading executable with phrase \"{}\": {}", ex.phrase, e);
+                None 
+            }
+        }
+    }).collect::<Vec<execute::Executable>>();
+
+    eprintln!("Loaded valid executables");
 
     let input_devices = input::get_cpal_input_devices()?;
     let mut input_device_index : usize = 0;
@@ -121,8 +150,9 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
 
     let mut program_args = ProgramArgs {
         add_command : false,
-        input_device_index_str : None,
+        clean_command : false,
         help : false,
+        input_device_index_str : None,
         model_path : None,
         print_asr_results : false,
         query_devices : false,
@@ -142,7 +172,10 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
             match opt {
                 getargs::Opt::Short('a') | getargs::Opt::Long("add-command") => {
                     program_args.add_command = true;
-                }
+                },
+                getargs::Opt::Short('c') | getargs::Opt::Long("clean") => {
+                    program_args.clean_command = true;
+                },
                 getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
                     let arg_m = opts.value();
                     anyhow::ensure!(arg_m.is_ok(), "Argument 'd' expected a device index");
@@ -159,7 +192,7 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
                 },
                 getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
                     program_args.print_asr_results = true;
-                }
+                },
                 getargs::Opt::Short('q') | getargs::Opt::Long("query-devices") => {
                     program_args.query_devices = true;
                 },
@@ -182,22 +215,26 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
 }
 
 fn check_arg_compatibility(program_args : &ProgramArgs) -> anyhow::Result<()> {
-    
-    if program_args.add_command && (program_args.remove_command || program_args.query_devices 
-    || program_args.print_asr_results || program_args.model_path.is_some()
-    || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // Check if the program has any normal runtime arguments
+    let has_normal_args = program_args.print_asr_results 
+        || program_args.model_path.is_some()
+        || program_args.input_device_index_str.is_some();
 
-    if program_args.remove_command && (program_args.query_devices || program_args.print_asr_results
-    || program_args.model_path.is_some() || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // List of booleans describing which arguments are present
+    // Only one should be true
+    let arg_compat = vec!(
+        program_args.add_command, 
+        program_args.remove_command,
+        program_args.query_devices,
+        program_args.clean_command,
+        has_normal_args
+    );
 
-    if program_args.query_devices && (program_args.print_asr_results || program_args.model_path.is_some()
-    || program_args.input_device_index_str.is_some()) {
-        anyhow::bail!("Incompatible combination of arguments");
-    }
+    // If more than one special argument is specified, or any special arguments
+    // are specified along with the normal arguments, the arguments are invalid
+    let args_are_valid = arg_compat.iter().filter(|arg| **arg).count() <= 1;
+
+    anyhow::ensure!(args_are_valid, "Incompatible combination of arguments");
 
     Ok(())
 }
@@ -277,6 +314,7 @@ fn print_help() {
         \n\nRun phrase detection using a user-provided VOSK model. \
         \n\nOptions: \
         \n -a, --add-command\t\trun the add command utility \
+        \n -c, --clean\t\t\tremove invalid commands \
         \n -d, --device <num>\t\tuse the specified input device (see '--query-devices') \
         \n -h, --help\t\t\tdisplay this message \
         \n -m, --model <path-to-model>\tuse the VOSK model located at the specified path  \
