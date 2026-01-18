@@ -245,7 +245,10 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
 
 pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Result<()> {
 
-    anyhow::ensure!(!executables.is_empty(), "No executables to be removed");
+    if executables.is_empty() { 
+        println!("No executables to be removed");
+        return Ok(());
+    }
 
     println!("----- Remove a command -----");
 
