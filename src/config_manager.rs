@@ -247,6 +247,7 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
 
     println!("----- Remove a command -----");
 
+    println!("[0] Cancel");
     execute::print_executables(executables);
 
     let mut index_str = String::new();
@@ -254,7 +255,12 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
     println!("Index to remove: ");
     std::io::stdin().read_line(&mut index_str)?;
 
-    let index : i32 = index_str.trim().parse().unwrap_or(-1);
+    let index : i32 = index_str.trim().parse().unwrap_or(0);
+
+    if index == 0 {
+        println!("Canceled");
+        return Ok(())
+    }
 
     anyhow::ensure!((1..=executables.len() as i32).contains(&index), "Invalid index");
 
