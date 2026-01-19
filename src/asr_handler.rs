@@ -33,6 +33,7 @@ pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResu
 
     // Start sending and processing stream data
     eprintln!("\nRunning ASR");
+    eprintln!("CTRL + C to exit");
 
     let asr_thread = thread::spawn(move || {
         loop {
