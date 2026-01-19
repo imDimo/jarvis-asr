@@ -55,7 +55,7 @@ fn get_vosk_linux(cargo_dir : &Path) {
 fn get_vosk_windows(cargo_dir : &Path) {
     let vosk = Path::new("libvosk.dll");
 
-    let local_libs = cargo_dir.join(Path::new("./lib/windows"));
+    let local_libs = cargo_dir.join(Path::new(".\\lib\\windows"));
 
     let mut local_vosk = false;
 
