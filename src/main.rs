@@ -293,10 +293,10 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
     }
 
     // Close the initial cpal stream
-    eprintln!("Dropping cpal stream");
+    eprintln!("\nDropping cpal stream");
     drop(cpal_stream);
 
-    eprintln!("\nJoining execution thread...");
+    eprintln!("Joining execution thread...");
     execute_thread.join().expect("ASR thread panicked");
 
     eprintln!("Joining processing thread...");
