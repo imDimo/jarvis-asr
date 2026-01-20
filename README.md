@@ -23,13 +23,17 @@ Larger and more complex models will take noticeably longer to initialize, and ca
 
 Pre-built executables may be uploaded to the Releases category, but do not expect them to be up-to-date.
 
-Because this project links to VOSK's shared libraries, the libraries must be present for both compiling and running the application. The libraries located in `/lib` will be used for compilation, and you should replace these if you wish to provide your own. If the libraries used in the compilation step are not available system-wide, they must also be copied into the directory where the binary is located for the application to run.
+This project is written in [Rust](https://rust-lang.org/tools/install/), and can be built with [Cargo](https://doc.rust-lang.org/cargo/).
+
+For Linux builds, this project also depends on `libasound2-dev` (Debian/Ubuntu/etc) or `alsa-lib-devel` (Fedora/etc).
+
+Because this project links to VOSK's shared libraries, these libraries must be present for both compiling and running the application. The libraries located under `/lib` will be used for compilation, and you should remove/replace these if you wish to provide your own. If the libraries used in the compilation step are not available system-wide, they must also be copied into the directory where the binary is located in order for the application to run.
 
 For Windows users, `libvosk.lib` is only used during compilation as is not required for running the application.
 
 Build the program with `cargo build --release`
 
-The binary will be placed in `/target/release/`
+The binary will be placed under `/target/release/`
 
 ## Running
 
