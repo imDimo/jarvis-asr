@@ -29,7 +29,7 @@ For Linux builds, this project also depends on `libasound2-dev` (Debian/Ubuntu/e
 
 Because this project links to VOSK's shared libraries, these libraries must be present for both compiling and running the application. The libraries located under `/lib` will be used for compilation, and you should remove/replace these if you wish to provide your own. If the libraries used in the compilation step are not available system-wide, they must also be copied into the directory where the binary is located in order for the application to run.
 
-For Windows users, `libvosk.lib` is only used during compilation as is not required for running the application.
+For Windows users, `libvosk.lib` is only used during compilation and is not required for running the application.
 
 Build the program with `cargo build --release`
 
