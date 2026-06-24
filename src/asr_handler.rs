@@ -52,11 +52,13 @@ pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResu
 
                                 if let Some(result) = recognizer.final_result().single() {
                                     let text = result.text.trim();
-                                    if print_results {
-                                        println!("{}", text);
-                                    }
+                                    if !text.is_empty() {
+                                        if print_results {
+                                            println!("{}", text);
+                                        }
 
-                                    sender.send(Ok(text.to_string())).ok();
+                                        sender.send(Ok(text.to_string())).ok();
+                                    }
                                 }
                             },
                             DecodingState::Failed => {
