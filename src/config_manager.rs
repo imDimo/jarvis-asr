@@ -12,7 +12,9 @@ struct PhrasesStruct {
     executables: Vec<execute::Executable>
 }
 
+// Create the config directory if it does not exist, and return its path
 pub fn init_config_directory() -> anyhow::Result<path::PathBuf> {
+
     let project_dirs = directories::ProjectDirs::from("com", "imdimo", "jarvis-asr");
 
     let config_path = project_dirs.context("Could not obtain location of project config directory. Is your home set?")?
@@ -26,13 +28,26 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf> {
             .context(format!("Failed to create config directory '{}'", config_path.to_string_lossy()))?
     }
 
-    let commands_file_path = &config_path.join(path::Path::new("commands.json"));
+    Ok(config_path)
+}
+
+// Create the commands file if it does not exist, and return its path
+pub fn init_commands(config_path : &path::Path, commands_file : &path::Path) -> anyhow::Result<path::PathBuf> {
+
+    // If a custom commands path is provided, it may be absolute,
+    // in which case we don't use the default config directory
+    let commands_file_path = if commands_file.is_absolute() {
+        commands_file.to_owned()
+    }
+    else {
+        config_path.join(commands_file)
+    };
 
     let commands_file_exists = commands_file_path.try_exists()
         .context(format!("Failed to verify existence of commands config path '{}'", commands_file_path.to_string_lossy()))?;
 
     if !commands_file_exists {
-        let commands_file = fs::File::create(commands_file_path)
+        let commands_file = fs::File::create(&commands_file_path)
             .context("Error initializing commands config file")?;
 
         // Write initial JSON data
@@ -45,23 +60,21 @@ pub fn init_config_directory() -> anyhow::Result<path::PathBuf> {
             .context("Error initializing commands file")?;
     }
 
-    Ok(config_path.to_owned())
+    Ok(commands_file_path)
 }
 
-pub fn load_executables(commands_dir : &path::Path) -> anyhow::Result<Vec<execute::Executable>> {
+pub fn load_executables(commands_file : &path::Path) -> anyhow::Result<Vec<execute::Executable>> {
 
-    let commands_file_path = &commands_dir.join(path::Path::new("commands.json"));
+    let commands_file_exists = commands_file.try_exists()
+        .context(format!("Failed to verify existence of command data path '{}'", commands_file.to_string_lossy()))?;
 
-    let commands_file_exists = commands_file_path.try_exists()
-        .context(format!("Failed to verify existence of command data path '{}'", commands_file_path.to_string_lossy()))?;
+    anyhow::ensure!(commands_file_exists, format!("Commands config directory '{}' does not exist", commands_file.to_string_lossy()));
 
-    anyhow::ensure!(commands_file_exists, format!("Commands config directory '{}' does not exist", commands_file_path.to_string_lossy()));
-
-    let command_file_contents = fs::read_to_string(commands_file_path)
+    let command_file_contents = fs::read_to_string(commands_file)
         .context("Failed to read contents of commands config file")?;
 
     let command_data : serde_json::Value = serde_json::from_str(&command_file_contents)
-        .context("Failed to parse JSON data from commands.json file")?;
+        .context("Failed to parse JSON data from commands config file")?;
 
     let root_obj = command_data.as_object()
         .context(String::from("JSON root must be an object"))?;
@@ -284,8 +297,7 @@ pub fn remove_executable(executables : &mut Vec<execute::Executable>) -> anyhow:
     Ok(())
 }
 
-pub fn write_executables(executables : Vec<execute::Executable>, commands_dir : &path::Path) -> anyhow::Result<()> {
-    let commands_file_path = &commands_dir.join(path::Path::new("commands.json"));
+pub fn write_executables(executables : Vec<execute::Executable>, commands_file_path : &path::Path) -> anyhow::Result<()> {
 
     let commands_file_exists = commands_file_path.try_exists()
         .context(format!("Failed to verify existence of commands data path {}",

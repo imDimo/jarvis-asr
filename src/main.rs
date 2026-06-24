@@ -17,6 +17,7 @@ use phrase_matcher as pm;
 struct ProgramArgs {
     add_command : bool,
     clean_command : bool,
+    command_path : Option<String>,
     help : bool,
     input_device_index_str : Option<String>,
     model_path : Option<String>,
@@ -40,10 +41,14 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let phrases_path = config::init_config_directory()?;
-    let mut dirty_executables = config::load_executables(&phrases_path)?;
+    let config_path = config::init_config_directory()?;
 
-    eprintln!("Read config");
+    let commands_file = program_args.command_path.unwrap_or("commands.json".to_owned());
+    let commands_path = config::init_commands(&config_path, path::Path::new(&commands_file))?;
+
+    let mut dirty_executables = config::load_executables(&commands_path)?;
+
+    eprintln!("Read {} executables from {}", dirty_executables.len(), commands_path.to_string_lossy());
 
     if program_args.clean_command {
         eprintln!("Cleaning executables...");
@@ -57,7 +62,7 @@ fn main() -> anyhow::Result<()> {
             }
         }).collect::<Vec<execute::Executable>>();
 
-        config::write_executables(cleaned_executables, &phrases_path)?;
+        config::write_executables(cleaned_executables, &commands_path)?;
         return Ok(());
     }
 
@@ -66,14 +71,14 @@ fn main() -> anyhow::Result<()> {
             eprintln!("Error adding executable: {}", e);
         }
         else {
-            config::write_executables(dirty_executables, &phrases_path)?;
+            config::write_executables(dirty_executables, &commands_path)?;
         }
         
         return Ok(());
     }
     else if program_args.remove_command {
         config::remove_executable(&mut dirty_executables)?;
-        config::write_executables(dirty_executables, &phrases_path)?;
+        config::write_executables(dirty_executables, &commands_path)?;
         return Ok(());
     }
 
@@ -151,6 +156,7 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
     let mut program_args = ProgramArgs {
         add_command : false,
         clean_command : false,
+        command_path : None,
         help : false,
         input_device_index_str : None,
         model_path : None,
@@ -173,21 +179,25 @@ fn process_cli_args() -> anyhow::Result<ProgramArgs> {
                 getargs::Opt::Short('a') | getargs::Opt::Long("add-command") => {
                     program_args.add_command = true;
                 },
-                getargs::Opt::Short('c') | getargs::Opt::Long("clean") => {
+                getargs::Opt::Short('c') | getargs::Opt::Long("clean-commands") => {
                     program_args.clean_command = true;
                 },
+                getargs::Opt::Short('C') | getargs::Opt::Long("commands") => {
+                    let arg_c = opts.value();
+                    anyhow::ensure!(arg_c.is_ok(), "Argument 'C'/'commands' expected a commands path");
+                    program_args.command_path = Some(arg_c.unwrap().to_owned());
+                },
                 getargs::Opt::Short('d') | getargs::Opt::Long("device") => {
-                    let arg_m = opts.value();
-                    anyhow::ensure!(arg_m.is_ok(), "Argument 'd' expected a device index");
-
-                    program_args.input_device_index_str = Some(arg_m.unwrap().to_owned());
+                    let arg_d = opts.value();
+                    anyhow::ensure!(arg_d.is_ok(), "Argument 'd'/'device' expected a device index");
+                    program_args.input_device_index_str = Some(arg_d.unwrap().to_owned());
                 },
                 getargs::Opt::Short('h') | getargs::Opt::Long("help") => {
                     program_args.help = true;
                 },
                 getargs::Opt::Short('m') | getargs::Opt::Long("model") => {
                     let arg_m = opts.value();
-                    anyhow::ensure!(arg_m.is_ok(), "Argument 'm' expected a model path");
+                    anyhow::ensure!(arg_m.is_ok(), "Argument 'm'/'model' expected a model path");
                     program_args.model_path = Some(arg_m.unwrap().to_owned());
                 },
                 getargs::Opt::Short('p') | getargs::Opt::Long("print") => {
@@ -315,6 +325,7 @@ fn print_help() {
         \n\nOptions: \
         \n -a, --add-command\t\trun the add command utility \
         \n -c, --clean\t\t\tremove invalid commands \
+        \n -C, --commands <path-to-json>\tuse the commands file located at the specified path \
         \n -d, --device <num>\t\tuse the specified input device (see '--query-devices') \
         \n -h, --help\t\t\tdisplay this message \
         \n -m, --model <path-to-model>\tuse the VOSK model located at the specified path  \

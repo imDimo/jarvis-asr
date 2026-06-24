@@ -45,7 +45,17 @@ A configuration file `commands.json` maps user-defined phrases to commands and t
 
 - Linux: `~/.config/jarvis-asr/`
 
-Jarvis-ASR can be run with the `-a` or `-r` flag to add or remove these mappings through the terminal, but it may be more convenient to edit `commands.json` by hand. As long as the JSON is properly formatted, improper executables will simply generate warnings and be ignored.
+## Creating/Editing Commands
+
+Jarvis-ASR can be run with the `-a` or `-r` flag to add or remove phrase-command mappings through the terminal, but it may be more convenient to make changes in a text editor. As long as the JSON is properly formatted, invalid entries will simply generate warnings and be ignored.
+
+The `-C` or `--commands` argument can be used to specify a different path for the commands file, which may be useful for maining multiple command sets.
+
+- To use a different file within the default config directory: `jarvis-asr -C some_commands.json` or `jarvis-asr -C <relative/path/to/some_commands.json>`
+
+- To use a file outside of the default config directory: `jarvis-asr -C </absolute/path/to/some_other_commands.json>`
+
+## Other Help
 
 Run `jarvis-asr --help` to see all available arguments.
 
