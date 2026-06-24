@@ -1,6 +1,7 @@
 use std::{
     fs,
-    path
+    path,
+    cmp::Ordering
 };
 use anyhow::Context;
 use crate::autocomplete;
@@ -72,8 +73,16 @@ pub fn load_executables(commands_dir : &path::Path) -> anyhow::Result<Vec<execut
 
     let mut executables = get_executables(executables_arr);
 
-    // Sort executables so longest phrases are matched first
-    executables.sort_by(|a, b| { b.phrase.len().cmp(&a.phrase.len()) });
+    // Sort executables so longest phrases and phrases beginning with non-wildcards are matched first
+    executables.sort_by(|a, b| {
+        let arg_ordering = match (a.phrase.starts_with("<"), b.phrase.starts_with("<")) {
+            (true, true) => Ordering::Equal,
+            (false, false) => Ordering::Equal,
+            (true, false) => Ordering::Greater,
+            (false, true) => {Ordering::Less}
+        };
+        arg_ordering.then(b.phrase.len().cmp(&a.phrase.len()))
+    });
 
     Ok(executables)
 }
