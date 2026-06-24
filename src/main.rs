@@ -232,13 +232,13 @@ fn check_arg_compatibility(program_args : &ProgramArgs) -> anyhow::Result<()> {
 
     // List of booleans describing which arguments are present
     // Only one should be true
-    let arg_compat = vec!(
+    let arg_compat = [
         program_args.add_command, 
         program_args.remove_command,
         program_args.query_devices,
         program_args.clean_command,
         has_normal_args
-    );
+    ];
 
     // If more than one special argument is specified, or any special arguments
     // are specified along with the normal arguments, the arguments are invalid
