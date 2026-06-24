@@ -129,7 +129,10 @@ fn match_phrase(input : &str, executable : &execute::Executable) -> (bool, Phras
 
 // Find indices of spoken words that may match the start of the given phrase
 fn get_start_points(words : &[String], phrase_parts : &[String], phrase_pos : &execute::PhrasePosition) -> Vec<usize> {
-    if *phrase_pos == execute::PhrasePosition::Any {
+    if arg_type(phrase_parts[0].as_str()) == ArgumentType::List || arg_type(phrase_parts[0].as_str()) == ArgumentType::Wildcard {
+        (0..words.len()).collect()
+    }
+    else if *phrase_pos == execute::PhrasePosition::Any {
         words.iter().enumerate().filter_map(|(i, word)| { 
             if **word == phrase_parts[0] {
                 Some(i)
