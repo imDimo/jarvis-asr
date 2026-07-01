@@ -140,15 +140,7 @@ fn main() -> anyhow::Result<()> {
         print_asr_results : program_args.print_asr_results
     };
 
-    match run(data) {
-        Ok(_) => {},
-        Err(e) => {
-            return Err(e)
-        }
-    };
-
-    eprintln!("Exited");
-    Ok(())
+    run(data)
 }
 
 fn process_cli_args() -> anyhow::Result<ProgramArgs> {
@@ -288,7 +280,7 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
         if let Ok(data) = execute_receiver.try_recv() {
             match data {
                 Ok(data) => {
-                        println!("{}", data);
+                        eprintln!("{}", data);
                 },
                 Err(e) => {
                     eprintln!("{}", e);
@@ -301,7 +293,7 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
         }
 
         // Wait a short while to prevent constant CPU consuption
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
     eprintln!("\nDropping cpal stream");
@@ -339,7 +331,6 @@ fn print_help() {
 }
 
 fn check_device_index(i : i32, input_devices : &[cpal::Device]) -> anyhow::Result<usize> {
-
     // 0 = default, 1 to len() = specific device
     anyhow::ensure!((0..=input_devices.len() as i32).contains(&i), "Invalid device index");
     Ok(i as usize)
