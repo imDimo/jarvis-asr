@@ -253,7 +253,7 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
 
     let ProgramData { input_device, model_path, executables, print_asr_results } = data;
 
-    let is_running : Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+    let is_running : Arc<AtomicBool> = Arc::new(AtomicBool::new(true));
     
     let is_running_copy = is_running.clone();
     ctrlc::set_handler(move || {
@@ -261,26 +261,28 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
     }).context("Could not set handler for ctrl-c: {}")?;
 
     let (cpal_stream, sample_rate, cpal_receiver) = input::init_cpal_input_stream(input_device)
-    .context("Error obtaining connection to recording thread: {}")?;
+        .context("Error obtaining connection to recording thread: {}")?;
 
     // Receiver to catch audio data from stream
     let cpal_receiver = cpal_receiver
         .context("Error obtaining connection to recording thread")?;
 
     let (asr_receiver, asr_thread) = asr_handler::run_asr(
-        &model_path, cpal_receiver, sample_rate, print_asr_results
+        &model_path, cpal_receiver, sample_rate, print_asr_results, is_running.clone()
     ).context("Error obtaining connection to ASR thread: {}")?;
 
-    let match_res = pm::run_phrase_matcher(asr_receiver, executables.clone());
+    let match_res = pm::run_phrase_matcher(
+        asr_receiver, executables.clone(), is_running.clone()
+    );
     let (match_receiver, match_thread) = match_res
         .context("Error obtaining connection to phrase matching thread")?;
     
-    let executor_res = execute::run_command_executor(match_receiver, executables.clone());
+    let executor_res = execute::run_command_executor(
+        match_receiver, executables.clone(), is_running.clone()
+    );
     let (execute_receiver, execute_thread) = executor_res
         .context("Error obtaining connection to execution thread")?;
 
-    is_running.store(true, Ordering::Relaxed);
-    
     // Main program loop - Controls when the program exits
     while is_running.load(Ordering::Relaxed) {
         if let Ok(data) = execute_receiver.try_recv() {
@@ -302,18 +304,17 @@ fn run(data : ProgramData) -> anyhow::Result<()> {
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
 
-    // Close the initial cpal stream
     eprintln!("\nDropping cpal stream");
     drop(cpal_stream);
 
-    eprintln!("Joining execution thread...");
-    execute_thread.join().expect("ASR thread panicked");
-
-    eprintln!("Joining processing thread...");
-    match_thread.join().expect("ASR thread panicked");
-
-    eprintln!("Joining ASR thread...");
+    eprintln!("Stopping ASR thread");
     asr_thread.join().expect("ASR thread panicked");
+
+    eprintln!("Stopping phrase-matching thread");
+    match_thread.join().expect("Match thread panicked");
+
+    eprintln!("Stopping execution thread");
+    execute_thread.join().expect("Execute thread panicked");        
 
     Ok(())
 }

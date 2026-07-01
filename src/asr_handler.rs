@@ -1,6 +1,6 @@
 use std::{
     path,
-    sync::mpsc,
+    sync::{Arc, atomic::AtomicBool, mpsc},
     thread::{self, JoinHandle}
 };
 use anyhow::Context;
@@ -14,7 +14,7 @@ pub const DATA_CHUNKS : usize = 100;
 pub type AsrReceiverResult = mpsc::Receiver<anyhow::Result<String>>;
 
 pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResult, sample_rate : u32, 
-    print_results : bool) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>)> {
+    print_results : bool, is_running : Arc<AtomicBool>) -> anyhow::Result<(AsrReceiverResult, JoinHandle<()>)> {
 
     // Sender and receiver to communicate text data
     let (sender, receiver) = mpsc::channel();
@@ -37,7 +37,7 @@ pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResu
 
     let asr_thread = thread::spawn(move || {
         loop {
-            if let Ok(data) = cpal_receiver.recv() {
+            if let Ok(data) = cpal_receiver.recv() && is_running.load(std::sync::atomic::Ordering::Relaxed) {
                 match data {
                     Ok(data) => {
                         let mut state = DecodingState::Running;
@@ -73,7 +73,6 @@ pub fn run_asr(model_path : &path::Path, cpal_receiver : input::CpalReceiverResu
                 }
             }
             else { // Senders have been dropped
-                eprintln!("ASR thread exited!");
                 return;
             }
         }

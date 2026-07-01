@@ -18,13 +18,13 @@ pub fn init_cpal_input_stream(input_dev : cpal::Device) -> anyhow::Result<(cpal:
     let err_sender = sender.clone();
 
     let config = input_dev.default_input_config()
-    .context("Error getting default input device configuration")?;
+        .context("Error getting default input device configuration")?;
 
     let num_channels = config.channels();
     let sample_rate = config.sample_rate();
 
     let stream_res = input_dev.build_input_stream(&config.into(),
-        move |data : &[i16], _: &_| {
+        move |data : &[i16], _| {
             let mut c : i32 = -1;
             let mut data = data.to_vec();
 

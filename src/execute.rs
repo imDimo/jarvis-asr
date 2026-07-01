@@ -1,7 +1,7 @@
 use std::{
     cmp,
     process,
-    sync::mpsc, 
+    sync::{Arc, atomic::AtomicBool, mpsc}, 
     thread::{self, JoinHandle}
 };
 
@@ -52,13 +52,13 @@ pub struct Executable {
 pub type ExecuteReceiver = mpsc::Receiver<anyhow::Result<String>>;
 
 pub fn run_command_executor(match_receiver : pm::PhraseMatchReceiver, 
-    executables : Vec<execute::Executable>) -> anyhow::Result<(ExecuteReceiver, JoinHandle<()>)> {
+    executables : Vec<execute::Executable>, is_running : Arc<AtomicBool>) -> anyhow::Result<(ExecuteReceiver, JoinHandle<()>)> {
 
     let (sender, receiver) = mpsc::channel();
 
     let executer_thread = thread::spawn(move || {
         loop {
-            if let Ok(data) = match_receiver.recv() {
+            if let Ok(data) = match_receiver.recv() && is_running.load(std::sync::atomic::Ordering::Relaxed) {
                 match data {
                     Ok((i, phrase_args)) => {
                         let command_data = match apply_arguments(&executables[i], &phrase_args) {
@@ -103,7 +103,6 @@ pub fn run_command_executor(match_receiver : pm::PhraseMatchReceiver,
                 }
             }
             else { // Senders have been dropped
-                eprintln!("Execute thread exited!");
                 return;
             }
         }
