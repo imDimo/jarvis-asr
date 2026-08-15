@@ -1,96 +1,92 @@
-use std::{io::Write, sync::mpsc};
+use std::io::Write;
 use anyhow::Context;
 
-pub fn search_fs() -> anyhow::Result<Option<String>> {
+pub fn get_path() -> anyhow::Result<Option<String>> {
 
-    let (sender, receiver) = mpsc::channel();
+    if let Err(e) = crossterm::terminal::enable_raw_mode() {
+        return anyhow::Result::Err(e).context("Error entering raw terminal");
+    }
 
-    let t = std::thread::spawn(move || {
-        let mut working_path = std::path::PathBuf::new();
+    let result = search_fs();
+    
+    if let Err(e) = crossterm::terminal::disable_raw_mode() {
+        return anyhow::Result::Err(e).context("Error exiting raw terminal");
+    }
 
-        if let Err(e) = crossterm::terminal::enable_raw_mode() {
-            sender.send(anyhow::Result::Err(e).context("Error entering raw terminal")).ok();
-        }
+    println!();
 
-        loop {
-            if let Ok(event) = crossterm::event::read()
-            && let Some(key_event) = event.as_key_event()
-            && key_event.is_press() {
-                match key_event.code {
-                    crossterm::event::KeyCode::Tab => {
-                        working_path = fs_autocomplete(working_path);
+    Ok(result)
+}
 
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
+fn search_fs() -> Option<String> {
 
-                        let _out_res = std::io::stdout().write_all(working_path.to_str().unwrap().as_bytes());
-                        let _flush_res = std::io::stdout().flush();
-                    },
-                    crossterm::event::KeyCode::Backspace => {
-                        let mut working_str = working_path.to_str().unwrap().to_owned();
-                        working_str.pop();
+    let mut working_path = std::path::PathBuf::new();
+    let search_result : Option<String>;
+    
+    loop {
+        if let Ok(event) = crossterm::event::read()
+        && let Some(key_event) = event.as_key_event()
+        && key_event.is_press() {
+            match key_event.code {
+                crossterm::event::KeyCode::Tab => {
+                    working_path = fs_autocomplete(working_path);
 
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
 
-                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
-                        let _flush_res = std::io::stdout().flush();
+                    let _out_res = std::io::stdout().write_all(working_path.to_str().unwrap().as_bytes());
+                    let _flush_res = std::io::stdout().flush();
+                },
+                crossterm::event::KeyCode::Backspace => {
+                    let mut working_str = working_path.to_str().unwrap().to_owned();
+                    working_str.pop();
 
-                        working_path = std::path::PathBuf::from(working_str);
-                    },
-                    crossterm::event::KeyCode::Char(c) => {
-                        if c == 'c' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                                sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
-                            }
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
 
-                            sender.send(Ok(None)).ok();
-                            println!();
-                            break;
-                        }
+                    let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                    let _flush_res = std::io::stdout().flush();
 
-                        let mut working_str = working_path.to_str().unwrap().to_owned();
-                        working_str.push(c);
-
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
-
-                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
-                        let _flush_res = std::io::stdout().flush();
-
-                        working_path = std::path::PathBuf::from(working_str);
-                    },
-                    crossterm::event::KeyCode::Enter => {
-                        if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                            sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
-                        }
-
-                        sender.send(Ok(Some(working_path.to_string_lossy().to_string()))).ok();
-                        println!();
+                    working_path = std::path::PathBuf::from(working_str);
+                },
+                crossterm::event::KeyCode::Char(c) => {
+                    if c == 'c' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                        search_result = None;
                         break;
-                    },
-                    _ => {}
-                }
+                    }
+
+                    let mut working_str = working_path.to_str().unwrap().to_owned();
+                    working_str.push(c);
+
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
+
+                    let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                    let _flush_res = std::io::stdout().flush();
+
+                    working_path = std::path::PathBuf::from(working_str);
+                },
+                crossterm::event::KeyCode::Enter => {
+
+                    search_result = Some(working_path.to_string_lossy().to_string());
+                    break;
+                },
+                _ => {}
             }
         }
-    });
+    }
 
-    let data = receiver.recv()
-        .context("Error retrieving command data")?;
-
-    drop(receiver);
-    t.join().expect("Error closing thread");
-
-    data
+    search_result
 }
 
 fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf {
+
     let curr_search = if !working_path.is_dir() && let Some(search) = working_path.iter().next_back() {
         search.to_str().unwrap().to_owned()
     }
