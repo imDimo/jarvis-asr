@@ -187,7 +187,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     }
 
     println!("Command:");
-    let command_opt = autocomplete::search_fs()?;
+    let command_opt = autocomplete::get_path()?;
 
     let command = if let Some(command) = command_opt {
         command.trim().to_owned()
@@ -203,7 +203,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
     let mut args : Vec<String> = Vec::new();
 
     println!("Arguments (Enter one at a time, leave empty to finish):");
-    let mut arg_opt = autocomplete::search_fs()?;
+    let mut arg_opt = autocomplete::get_path()?;
 
     let mut arg = if let Some(arg) = arg_opt {
         arg.trim().to_owned()
@@ -216,7 +216,7 @@ pub fn add_executable(executables : &mut Vec<execute::Executable>) -> anyhow::Re
         args.push(arg.clone());
         arg.clear();
 
-        arg_opt = autocomplete::search_fs()?;
+        arg_opt = autocomplete::get_path()?;
 
         arg = if let Some(arg) = arg_opt {
             arg.trim().to_owned()

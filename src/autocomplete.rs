@@ -1,104 +1,101 @@
-use std::{io::Write, sync::mpsc};
+use std::io::Write;
 use anyhow::Context;
 
-pub fn search_fs() -> anyhow::Result<Option<String>> {
+pub fn get_path() -> anyhow::Result<Option<String>> {
 
-    let (sender, receiver) = mpsc::channel();
+    if let Err(e) = crossterm::terminal::enable_raw_mode() {
+        return anyhow::Result::Err(e).context("Error entering raw terminal");
+    }
 
-    let t = std::thread::spawn(move || {
-        let mut working_path = std::path::PathBuf::new();
+    let result = search_fs();
+    
+    if let Err(e) = crossterm::terminal::disable_raw_mode() {
+        return anyhow::Result::Err(e).context("Error exiting raw terminal");
+    }
 
-        if let Err(e) = crossterm::terminal::enable_raw_mode() {
-            sender.send(anyhow::Result::Err(e).context("Error entering raw terminal")).ok();
-        }
+    println!();
 
-        loop {
-            if let Ok(event) = crossterm::event::read()
-            && let Some(key_event) = event.as_key_event()
-            && key_event.is_press() {
-                match key_event.code {
-                    crossterm::event::KeyCode::Tab => {
-                        working_path = fs_autocomplete(working_path);
-
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
-
-                        let _out_res = std::io::stdout().write_all(working_path.to_str().unwrap().as_bytes());
-                        let _flush_res = std::io::stdout().flush();
-                    },
-                    crossterm::event::KeyCode::Backspace => {
-                        let mut working_str = working_path.to_str().unwrap().to_owned();
-                        working_str.pop();
-
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
-
-                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
-                        let _flush_res = std::io::stdout().flush();
-
-                        working_path = std::path::PathBuf::from(working_str);
-                    },
-                    crossterm::event::KeyCode::Char(c) => {
-                        if c == 'c' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
-                            if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                                sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
-                            }
-
-                            sender.send(Ok(None)).ok();
-                            println!();
-                            break;
-                        }
-
-                        let mut working_str = working_path.to_str().unwrap().to_owned();
-                        working_str.push(c);
-
-                        let _clear_res = crossterm::queue!(std::io::stdout(),
-                            crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                            crossterm::cursor::MoveToColumn(0)
-                        );
-
-                        let _out_res = std::io::stdout().write_all(working_str.as_bytes());
-                        let _flush_res = std::io::stdout().flush();
-
-                        working_path = std::path::PathBuf::from(working_str);
-                    },
-                    crossterm::event::KeyCode::Enter => {
-                        if let Err(e) = crossterm::terminal::disable_raw_mode() {
-                            sender.send(anyhow::Result::Err(e).context("Error exiting raw terminal")).ok();
-                        }
-
-                        sender.send(Ok(Some(working_path.to_string_lossy().to_string()))).ok();
-                        println!();
-                        break;
-                    },
-                    _ => {}
-                }
-            }
-        }
-    });
-
-    let data = receiver.recv()
-        .context("Error retrieving command data")?;
-
-    drop(receiver);
-    t.join().expect("Error closing thread");
-
-    data
+    Ok(result)
 }
 
-fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf {
-    let curr_search = if !working_path.is_dir() && let Some(search) = working_path.iter().next_back() {
+fn search_fs() -> Option<String> {
+
+    let mut working_path = std::path::PathBuf::new();
+    let search_result : Option<String>;
+    
+    loop {
+        if let Ok(event) = crossterm::event::read()
+        && let Some(key_event) = event.as_key_event()
+        && key_event.is_press() {
+            match key_event.code {
+                crossterm::event::KeyCode::Tab => {
+                    working_path = fs_autocomplete(working_path);
+
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
+
+                    let _out_res = std::io::stdout().write_all(working_path.to_str().unwrap().as_bytes());
+                    let _flush_res = std::io::stdout().flush();
+                },
+                crossterm::event::KeyCode::Backspace => {
+                    let mut working_str = working_path.to_str().unwrap().to_owned();
+                    working_str.pop();
+
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
+
+                    let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                    let _flush_res = std::io::stdout().flush();
+
+                    working_path = std::path::PathBuf::from(working_str);
+                },
+                crossterm::event::KeyCode::Char(c) => {
+                    if c == 'c' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                        search_result = None;
+                        break;
+                    }
+
+                    let mut working_str = working_path.to_str().unwrap().to_owned();
+                    working_str.push(c);
+
+                    let _clear_res = crossterm::queue!(std::io::stdout(),
+                        crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                        crossterm::cursor::MoveToColumn(0)
+                    );
+
+                    let _out_res = std::io::stdout().write_all(working_str.as_bytes());
+                    let _flush_res = std::io::stdout().flush();
+
+                    working_path = std::path::PathBuf::from(working_str);
+                },
+                crossterm::event::KeyCode::Enter => {
+
+                    search_result = Some(working_path.to_string_lossy().to_string());
+                    break;
+                },
+                _ => {}
+            }
+        }
+    }
+
+    search_result
+}
+
+fn fs_autocomplete(working_path : std::path::PathBuf) -> std::path::PathBuf {
+
+    let mut expanded_path = expand_dirs(&working_path);
+    let curr_search = if !expanded_path.is_dir() && let Some(search) = expanded_path.iter().next_back() {
         search.to_str().unwrap().to_owned()
     }
     else {
         String::new()
     };
 
-    let current_dir = get_current_dir(&working_path);
+    let current_dir = get_current_dir(&expanded_path);
 
     let paths_res = std::fs::read_dir(&current_dir);
     if let Ok(paths) = paths_res {
@@ -106,16 +103,16 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
             p.ok()
         }).collect::<Vec<std::fs::DirEntry>>();
 
-        let file_query = get_hints(&working_path, &current_dir, &dir_entries);
+        let file_query = get_hints(&expanded_path, &current_dir, &dir_entries);
 
         // If there is only one potential file/directory, replace the current partial search with the complete path
         if file_query.len() == 1 {
-            if working_path.file_name().is_some() {
-                working_path.pop();
+            if expanded_path.file_name().is_some() {
+                expanded_path.pop();
             }
 
             let target_loc = &file_query[0].to_owned();
-            working_path.push(target_loc);
+            expanded_path.push(target_loc);
         }
         else {
             let _out_res = std::io::stdout().write_all("\n".as_bytes());
@@ -126,22 +123,22 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
                 let file_strings = file_query.iter().map(|path| path.iter().next_back()
                     .unwrap().to_str().unwrap().to_owned()).collect::<Vec<String>>();
 
-                modify_search(&mut working_path, &curr_search, &file_strings);
+                modify_search(&mut expanded_path, &curr_search, &file_strings);
             }
         }
     }
 
     // Add trailing slash to autocompleted directories
-    if working_path.is_dir() {
-        let mut dir_osstr = working_path.as_os_str().to_owned();
+    if expanded_path.is_dir() {
+        let mut dir_osstr = expanded_path.as_os_str().to_owned();
 
         if !dir_osstr.to_string_lossy().ends_with(std::path::MAIN_SEPARATOR) {
             dir_osstr.push(std::path::MAIN_SEPARATOR_STR);
-            working_path = dir_osstr.into();
+            expanded_path = dir_osstr.into();
         }
     }
 
-    working_path
+    expanded_path
 }
 
 fn get_current_dir(working_path : &std::path::PathBuf) -> std::path::PathBuf {
@@ -153,6 +150,15 @@ fn get_current_dir(working_path : &std::path::PathBuf) -> std::path::PathBuf {
     }
     else {
         std::path::PathBuf::new()
+    }
+}
+
+fn expand_dirs(working_path : &std::path::PathBuf) -> std::path::PathBuf {
+    if working_path.starts_with("~/") && let Some(home_dir) = std::env::home_dir() {
+        home_dir.join(working_path.strip_prefix("~/").unwrap())
+    }
+    else {
+        working_path.to_owned()
     }
 }
 
@@ -205,8 +211,8 @@ fn modify_search(working_path : &mut std::path::PathBuf, curr_search : &str, fil
         if let Some(max_len) = max_len_query {
             let mut char_table : Vec<Vec<char>> = vec!();
 
-            file_strings.iter().for_each(|str| {
-                let chars = str.chars().collect::<Vec<char>>();
+            file_strings.iter().for_each(|file_str| {
+                let chars = file_str.chars().collect::<Vec<char>>();
                 char_table.push(chars);
             });
 
