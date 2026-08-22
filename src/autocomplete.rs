@@ -201,8 +201,8 @@ fn modify_search(working_path : &mut std::path::PathBuf, curr_search : &str, fil
         if let Some(max_len) = max_len_query {
             let mut char_table : Vec<Vec<char>> = vec!();
 
-            file_strings.iter().for_each(|str| {
-                let chars = str.chars().collect::<Vec<char>>();
+            file_strings.iter().for_each(|file_str| {
+                let chars = file_str.chars().collect::<Vec<char>>();
                 char_table.push(chars);
             });
 
