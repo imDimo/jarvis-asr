@@ -17,14 +17,14 @@ impl serde::Serialize for PhrasePosition {
         where
             S: serde::Serializer {
         // Use snakecase representations of enum values for JSON
-        let str = match self {
+        let pos_str = match self {
             PhrasePosition::Any => "any",
             PhrasePosition::Start => "at_start",
             PhrasePosition::Exact => "match_exact",
             PhrasePosition::Err => "unknown"
         };
 
-        serializer.serialize_str(str)
+        serializer.serialize_str(pos_str)
     }
 }
 
@@ -167,7 +167,7 @@ pub fn validate_executable(executable : &Executable) -> anyhow::Result<()> {
 
     // Verify that there is at most one variable-length arg, at the end of the phrase
     let mut num_list_args = executable.phrase.split(' ')
-        .filter(|str| pm::arg_type(str) == pm::ArgumentType::List).count();
+        .filter(|arg_str| pm::arg_type(arg_str) == pm::ArgumentType::List).count();
 
     if num_list_args > 1 || (num_list_args == 1 && !executable.phrase.ends_with("...>")) {
         anyhow::bail!("Executable may only contain a singular variable-length argument, and it must be at the end of the phrase");
@@ -192,7 +192,7 @@ pub fn validate_executable(executable : &Executable) -> anyhow::Result<()> {
 
     // Verify that each argument label in the phrase matches to at least one in the arguments list
     for arg in executable.phrase.split(' ')
-        .filter(|str| pm::arg_type(str) != pm::ArgumentType::Default) {
+        .filter(|arg_str| pm::arg_type(arg_str) != pm::ArgumentType::Default) {
         if !executable.args.contains(&arg.to_owned()) {
             anyhow::bail!("Phrase references unknown argument \"{}\"", arg);
         }
