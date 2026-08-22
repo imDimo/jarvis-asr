@@ -85,16 +85,17 @@ fn search_fs() -> Option<String> {
     search_result
 }
 
-fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf {
+fn fs_autocomplete(working_path : std::path::PathBuf) -> std::path::PathBuf {
 
-    let curr_search = if !working_path.is_dir() && let Some(search) = working_path.iter().next_back() {
+    let mut expanded_path = expand_dirs(&working_path);
+    let curr_search = if !expanded_path.is_dir() && let Some(search) = expanded_path.iter().next_back() {
         search.to_str().unwrap().to_owned()
     }
     else {
         String::new()
     };
 
-    let current_dir = get_current_dir(&working_path);
+    let current_dir = get_current_dir(&expanded_path);
 
     let paths_res = std::fs::read_dir(&current_dir);
     if let Ok(paths) = paths_res {
@@ -102,16 +103,16 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
             p.ok()
         }).collect::<Vec<std::fs::DirEntry>>();
 
-        let file_query = get_hints(&working_path, &current_dir, &dir_entries);
+        let file_query = get_hints(&expanded_path, &current_dir, &dir_entries);
 
         // If there is only one potential file/directory, replace the current partial search with the complete path
         if file_query.len() == 1 {
-            if working_path.file_name().is_some() {
-                working_path.pop();
+            if expanded_path.file_name().is_some() {
+                expanded_path.pop();
             }
 
             let target_loc = &file_query[0].to_owned();
-            working_path.push(target_loc);
+            expanded_path.push(target_loc);
         }
         else {
             let _out_res = std::io::stdout().write_all("\n".as_bytes());
@@ -122,22 +123,22 @@ fn fs_autocomplete(mut working_path : std::path::PathBuf) -> std::path::PathBuf 
                 let file_strings = file_query.iter().map(|path| path.iter().next_back()
                     .unwrap().to_str().unwrap().to_owned()).collect::<Vec<String>>();
 
-                modify_search(&mut working_path, &curr_search, &file_strings);
+                modify_search(&mut expanded_path, &curr_search, &file_strings);
             }
         }
     }
 
     // Add trailing slash to autocompleted directories
-    if working_path.is_dir() {
-        let mut dir_osstr = working_path.as_os_str().to_owned();
+    if expanded_path.is_dir() {
+        let mut dir_osstr = expanded_path.as_os_str().to_owned();
 
         if !dir_osstr.to_string_lossy().ends_with(std::path::MAIN_SEPARATOR) {
             dir_osstr.push(std::path::MAIN_SEPARATOR_STR);
-            working_path = dir_osstr.into();
+            expanded_path = dir_osstr.into();
         }
     }
 
-    working_path
+    expanded_path
 }
 
 fn get_current_dir(working_path : &std::path::PathBuf) -> std::path::PathBuf {
@@ -149,6 +150,15 @@ fn get_current_dir(working_path : &std::path::PathBuf) -> std::path::PathBuf {
     }
     else {
         std::path::PathBuf::new()
+    }
+}
+
+fn expand_dirs(working_path : &std::path::PathBuf) -> std::path::PathBuf {
+    if working_path.starts_with("~/") && let Some(home_dir) = std::env::home_dir() {
+        home_dir.join(working_path.strip_prefix("~/").unwrap())
+    }
+    else {
+        working_path.to_owned()
     }
 }
 
