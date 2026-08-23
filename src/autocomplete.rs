@@ -60,7 +60,13 @@ fn search_fs() -> Option<String> {
                     }
 
                     let mut working_str = working_path.to_str().unwrap().to_owned();
-                    working_str.push(c);
+
+                    if c == 'u' && key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) {
+                        working_str.clear();
+                    }
+                    else {
+                        working_str.push(c);
+                    }
 
                     let _clear_res = crossterm::queue!(std::io::stdout(),
                         crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
